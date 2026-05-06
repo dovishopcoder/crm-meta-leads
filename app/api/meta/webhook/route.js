@@ -223,7 +223,7 @@ async function upsertLeadFromMessage(supabase, message) {
   const now = new Date().toISOString();
   const { data: existing, error: existingError } = await supabase
     .from("leads")
-    .select("id, name, platform, meta_email")
+    .select("id, name, platform, meta_email, meta_url")
     .eq("meta_contact_id", message.metaContactId)
     .maybeSingle();
 
@@ -235,7 +235,7 @@ async function upsertLeadFromMessage(supabase, message) {
       .update({
         name: message.name,
         avatar_url: message.avatarUrl,
-        meta_url: message.metaUrl,
+        meta_url: chooseMetaUrl(existing.meta_url, message.metaUrl, message.metaContactId),
         meta_email: message.email || existing.meta_email || null,
         unread: true,
         last_message_at: message.messageAt || now,
@@ -274,6 +274,25 @@ async function upsertLeadFromMessage(supabase, message) {
   if (error) throw error;
   await insertActivity(supabase, data.id, "incoming_message", { source: "meta_webhook", created: true });
   return data;
+}
+
+function chooseMetaUrl(existingUrl, generatedUrl, contactId) {
+  if (!existingUrl) return generatedUrl;
+
+  try {
+    const existing = new URL(existingUrl);
+    const generated = new URL(generatedUrl);
+    const existingSelectedId = existing.searchParams.get("selected_item_id");
+    const generatedSelectedId = generated.searchParams.get("selected_item_id");
+
+    if (existingSelectedId && existingSelectedId !== contactId && existingSelectedId !== generatedSelectedId) {
+      return existingUrl;
+    }
+  } catch {
+    return generatedUrl;
+  }
+
+  return generatedUrl;
 }
 
 async function insertActivity(supabase, leadId, type, payload) {
