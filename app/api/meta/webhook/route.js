@@ -5,6 +5,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const verifyToken = process.env.META_VERIFY_TOKEN;
 const pageAccessToken = process.env.META_PAGE_ACCESS_TOKEN;
+const graphVersion = process.env.META_GRAPH_VERSION || "v21.0";
 
 function serverSupabase() {
   if (!supabaseUrl || !serviceRoleKey) {
@@ -60,6 +61,7 @@ function normalizeWebhookPayload(payload) {
       platform: payload.platform || "facebook",
       avatarUrl: payload.avatar_url || "https://i.pravatar.cc/120?img=15",
       email: payload.email || "",
+      pageId: payload.page_id || "",
       metaUrl: payload.meta_url || "https://business.facebook.com/latest/inbox/all",
       messageAt: payload.message_at || new Date().toISOString()
     }];
@@ -79,6 +81,7 @@ function normalizeWebhookPayload(payload) {
         platform: value.platform || change.field || payload.object || "facebook",
         avatarUrl: value.sender?.profile_pic || value.contact?.profile_pic || "https://i.pravatar.cc/120?img=15",
         email: value.sender?.email || value.from?.email || value.contact?.email || "",
+        pageId: value.recipient?.id || value.page_id || entry.id || "",
         metaUrl: value.meta_url || "https://business.facebook.com/latest/inbox/all",
         messageAt: value.timestamp ? new Date(Number(value.timestamp)).toISOString() : new Date().toISOString()
       });
@@ -94,6 +97,7 @@ function normalizeWebhookPayload(payload) {
         platform: payload.object === "instagram" ? "instagram" : "facebook",
         avatarUrl: "https://i.pravatar.cc/120?img=15",
         email: messaging.sender?.email || "",
+        pageId: messaging.recipient?.id || entry.id || "",
         metaUrl: "https://business.facebook.com/latest/inbox/all",
         messageAt: messaging.timestamp ? new Date(Number(messaging.timestamp)).toISOString() : new Date().toISOString()
       });
@@ -107,32 +111,105 @@ async function enrichMessageProfile(message) {
   if (!pageAccessToken || !message.metaContactId) return message;
 
   try {
-    const url = new URL(`https://graph.facebook.com/v21.0/${message.metaContactId}`);
+    const url = new URL(`https://graph.facebook.com/${graphVersion}/${message.metaContactId}`);
     url.searchParams.set("fields", "first_name,last_name,name,profile_pic,email");
+    url.searchParams.set("access_token", pageAccessToken);
+
+    const response = await fetch(url);
+    if (!response.ok) return enrichMessageParticipants(message);
+
+    const profile = await response.json();
+    const name = profile.name || [profile.first_name, profile.last_name].filter(Boolean).join(" ");
+
+    return enrichMessageParticipants({
+      ...message,
+      name: name || message.name,
+      avatarUrl: profile.profile_pic || message.avatarUrl,
+      email: profile.email || message.email || ""
+    });
+  } catch {
+    return enrichMessageParticipants(message);
+  }
+}
+
+async function enrichMessageParticipants(message) {
+  if (message.email || !pageAccessToken || !message.metaContactId || !message.pageId) {
+    return message;
+  }
+
+  try {
+    const conversation = await findConversationForContact(message.pageId, message.metaContactId);
+    if (!conversation?.id) return message;
+
+    const url = new URL(`https://graph.facebook.com/${graphVersion}/${conversation.id}`);
+    url.searchParams.set("fields", "participants");
     url.searchParams.set("access_token", pageAccessToken);
 
     const response = await fetch(url);
     if (!response.ok) return message;
 
-    const profile = await response.json();
-    const name = profile.name || [profile.first_name, profile.last_name].filter(Boolean).join(" ");
+    const data = await response.json();
+    const participant = findClientParticipant(data.participants?.data || [], message.metaContactId, message.pageId);
 
     return {
       ...message,
-      name: name || message.name,
-      avatarUrl: profile.profile_pic || message.avatarUrl,
-      email: profile.email || message.email || ""
+      name: participant?.name || message.name,
+      email: participant?.email || message.email || ""
     };
   } catch {
     return message;
   }
 }
 
+async function findConversationForContact(pageId, contactId) {
+  const directUrl = new URL(`https://graph.facebook.com/${graphVersion}/${pageId}/conversations`);
+  directUrl.searchParams.set("fields", "participants");
+  directUrl.searchParams.set("user_id", contactId);
+  directUrl.searchParams.set("limit", "5");
+  directUrl.searchParams.set("access_token", pageAccessToken);
+
+  const directResponse = await fetch(directUrl);
+  if (directResponse.ok) {
+    const directData = await directResponse.json();
+    const directConversation = findConversationWithContact(directData.data || [], contactId, pageId);
+    if (directConversation) return directConversation;
+  }
+
+  const listUrl = new URL(`https://graph.facebook.com/${graphVersion}/${pageId}/conversations`);
+  listUrl.searchParams.set("fields", "participants");
+  listUrl.searchParams.set("limit", "25");
+  listUrl.searchParams.set("access_token", pageAccessToken);
+
+  const listResponse = await fetch(listUrl);
+  if (!listResponse.ok) return null;
+
+  const listData = await listResponse.json();
+  return findConversationWithContact(listData.data || [], contactId, pageId);
+}
+
+function findConversationWithContact(conversations, contactId, pageId) {
+  return conversations.find((conversation) => {
+    const participants = conversation.participants?.data || [];
+    return Boolean(findClientParticipant(participants, contactId, pageId));
+  });
+}
+
+function findClientParticipant(participants, contactId, pageId) {
+  return participants.find((participant) => {
+    const participantId = participant.id || "";
+    const participantEmail = participant.email || "";
+    return participantId === contactId || participantEmail.startsWith(`${contactId}@`);
+  }) || participants.find((participant) => {
+    const participantId = participant.id || "";
+    return participantId && participantId !== pageId;
+  });
+}
+
 async function upsertLeadFromMessage(supabase, message) {
   const now = new Date().toISOString();
   const { data: existing, error: existingError } = await supabase
     .from("leads")
-    .select("id, name, platform")
+    .select("id, name, platform, email")
     .eq("meta_contact_id", message.metaContactId)
     .maybeSingle();
 
@@ -144,7 +221,7 @@ async function upsertLeadFromMessage(supabase, message) {
       .update({
         name: message.name,
         avatar_url: message.avatarUrl,
-        email: message.email || null,
+        email: message.email || existing.email || null,
         unread: true,
         last_message_at: message.messageAt || now,
         updated_at: now
