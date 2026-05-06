@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="ro">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Meta Leads CRM</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="inbox-panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Meta Inbox</p>
+            <h1>Lead-uri noi</h1>
+          </div>
+          <span class="count-badge" id="leadCount">0</span>
+        </div>
+
+        <div class="search-wrap">
+          <input id="leadSearch" type="search" placeholder="Cauta dupa nume, tag sau platforma" />
+        </div>
+
+        <div class="quick-filters" aria-label="Filtre lead-uri">
+          <button class="chip active" data-filter="all">Toate</button>
+          <button class="chip" data-filter="facebook">Facebook</button>
+          <button class="chip" data-filter="instagram">Instagram</button>
+        </div>
+
+        <label class="compact-label">
+          Manager
+          <select id="managerFilter">
+            <option value="all">Toti managerii</option>
+          </select>
+        </label>
+
+        <section id="leadList" class="lead-list" aria-label="Lista chat-uri necitite"></section>
+      </aside>
+
+      <section class="calendar-panel">
+        <header class="calendar-toolbar">
+          <div class="calendar-title">
+            <p class="eyebrow">Follow-up</p>
+            <h2 id="calendarTitle">Azi</h2>
+          </div>
+
+          <div class="toolbar-actions">
+            <button class="icon-btn" id="prevRange" title="Perioada precedenta" aria-label="Perioada precedenta">
+              <span aria-hidden="true">‹</span>
+            </button>
+            <button class="today-btn" id="todayBtn">Azi</button>
+            <button class="icon-btn" id="nextRange" title="Perioada urmatoare" aria-label="Perioada urmatoare">
+              <span aria-hidden="true">›</span>
+            </button>
+            <div class="segmented" role="tablist" aria-label="Unitate calendar">
+              <button class="active" data-view="day">Zi</button>
+              <button data-view="week">Saptamana</button>
+              <button data-view="month">Luna</button>
+            </div>
+          </div>
+        </header>
+
+        <div class="calendar-meta">
+          <span>Prima coloana este mereu data selectata.</span>
+          <span>Trage un lead peste o zi sau foloseste butonul Programeaza.</span>
+        </div>
+
+        <section id="calendarGrid" class="calendar-grid" aria-label="Calendar follow-up"></section>
+
+        <section class="stats-panel" aria-label="Statistici CRM">
+          <div class="archive-head">
+            <div>
+              <p class="eyebrow">Statistica</p>
+              <h2>Performanta manageri si etape</h2>
+            </div>
+          </div>
+
+          <div class="stats-cards" id="statsCards"></div>
+
+          <div class="stats-layout">
+            <div class="stats-table-card">
+              <h3>Manageri</h3>
+              <table class="archive-table compact-table">
+                <thead>
+                  <tr>
+                    <th>Manager</th>
+                    <th>Lead-uri</th>
+                    <th>Prelucrari</th>
+                    <th>Necitite</th>
+                    <th>Arhivate</th>
+                  </tr>
+                </thead>
+                <tbody id="managerStatsTable"></tbody>
+              </table>
+            </div>
+
+            <div class="stats-table-card">
+              <h3>Etape / Tags</h3>
+              <table class="archive-table compact-table">
+                <thead>
+                  <tr>
+                    <th>Etapa</th>
+                    <th>Lead-uri</th>
+                    <th>Prelucrari</th>
+                  </tr>
+                </thead>
+                <tbody id="stageStatsTable"></tbody>
+              </table>
+            </div>
+
+            <div class="stats-table-card">
+              <h3>Produse propuse</h3>
+              <table class="archive-table compact-table">
+                <thead>
+                  <tr>
+                    <th>Produs</th>
+                    <th>Propuneri</th>
+                    <th>Acceptate</th>
+                  </tr>
+                </thead>
+                <tbody id="productStatsTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="archive-panel" aria-label="Clienti arhivati">
+          <div class="archive-head">
+            <div>
+              <p class="eyebrow">Arhiva</p>
+              <h2>Clienti inactivi</h2>
+            </div>
+            <span class="count-badge archive-count" id="archiveCount">0</span>
+          </div>
+          <div class="archive-table-wrap">
+            <table class="archive-table">
+              <thead>
+                <tr>
+                  <th>Client</th>
+                  <th>Platforma</th>
+                  <th>Manager</th>
+                  <th>Tags</th>
+                  <th>Status</th>
+                  <th>Actiuni</th>
+                </tr>
+              </thead>
+              <tbody id="archiveTable"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <dialog id="clientDialog" class="client-dialog">
+      <form method="dialog" class="client-modal" id="clientForm">
+        <button type="button" class="close-btn" aria-label="Inchide">×</button>
+        <div class="modal-top">
+          <img id="modalAvatar" alt="" />
+          <div>
+            <p class="eyebrow" id="modalPlatform">Instagram</p>
+            <h3 id="modalName">Client</h3>
+            <a id="modalMetaLink" href="#" target="_blank" rel="noreferrer">Deschide in Meta Business Suite</a>
+          </div>
+        </div>
+
+        <div class="field-grid">
+          <label>
+            Status
+            <select id="modalStatus">
+              <option value="new">Nou</option>
+              <option value="scheduled">Programat</option>
+              <option value="contacted">Contactat</option>
+              <option value="closed">Inchis</option>
+            </select>
+          </label>
+          <label>
+            Manager responsabil
+            <select id="modalManager"></select>
+          </label>
+        </div>
+
+        <div class="field-grid">
+          <label>
+            Urmatorul mesaj
+            <input id="modalFollowDate" type="date" />
+          </label>
+          <label>
+            Prioritate
+            <select id="modalPriority">
+              <option value="normal">Normala</option>
+              <option value="high">Inalta</option>
+              <option value="low">Joasa</option>
+            </select>
+          </label>
+        </div>
+
+        <label>
+          Etapa / tag principal
+          <select id="modalStage"></select>
+        </label>
+
+        <label>
+          Tags extra
+          <input id="modalTags" placeholder="ex: cald, mobila, pret" />
+        </label>
+
+        <div class="modal-section">
+          <div>
+            <p class="eyebrow">Produse propuse</p>
+            <div class="product-grid" id="modalProducts"></div>
+          </div>
+        </div>
+
+        <div class="client-meta-grid">
+          <span id="modalCreatedAt">Creat: -</span>
+          <span id="modalProcessedCount">Prelucrari: 0</span>
+          <span id="modalLastProcessedAt">Ultima prelucrare: -</span>
+        </div>
+
+        <label>
+          Telefon / contact extra
+          <input id="modalPhone" placeholder="+373..." />
+        </label>
+
+        <label>
+          Comentarii
+          <textarea id="modalNotes" rows="5" placeholder="Note interne despre client"></textarea>
+        </label>
+
+        <p class="modal-warning" id="modalWarning" hidden></p>
+
+        <div class="modal-actions">
+          <button type="button" class="danger-btn" id="archiveBtn">Arhiveaza</button>
+          <button type="button" class="ghost-btn" id="openScheduleBtn">Programeaza</button>
+          <button type="submit" class="primary-btn" value="save">Salveaza</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="app.js"></script>
+  </body>
+</html>
