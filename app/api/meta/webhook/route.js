@@ -154,11 +154,24 @@ async function enrichMessageParticipants(message) {
     return {
       ...message,
       name: participant?.name || message.name,
-      email: participant?.email || message.email || ""
+      email: participant?.email || message.email || "",
+      metaUrl: buildMetaConversationUrl(message.pageId, conversation.id)
     };
   } catch {
     return message;
   }
+}
+
+function buildMetaConversationUrl(pageId, conversationId) {
+  const url = new URL("https://business.facebook.com/latest/inbox/all");
+  if (pageId) {
+    url.searchParams.set("asset_id", pageId);
+    url.searchParams.set("mailbox_id", pageId);
+  }
+  if (conversationId) {
+    url.searchParams.set("selected_item_id", conversationId);
+  }
+  return url.toString();
 }
 
 async function findConversationForContact(pageId, contactId) {
@@ -221,6 +234,7 @@ async function upsertLeadFromMessage(supabase, message) {
       .update({
         name: message.name,
         avatar_url: message.avatarUrl,
+        meta_url: message.metaUrl,
         meta_email: message.email || existing.meta_email || null,
         unread: true,
         last_message_at: message.messageAt || now,
