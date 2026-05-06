@@ -96,16 +96,25 @@ export async function loadCrmConfig() {
   };
 }
 
-export async function createManager({ name, email, role, color }) {
+export async function createManager({ name, email, password, role, color }) {
   if (!supabase) throw new Error("Supabase nu este configurat.");
-  const { error } = await supabase.from("managers").insert({
-    name,
-    email,
-    role,
-    color: color || "#1e8f72",
-    active: true
+
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) throw sessionError;
+  const accessToken = sessionData.session?.access_token;
+  if (!accessToken) throw new Error("Sesiunea admin lipseste.");
+
+  const response = await fetch("/api/admin/managers", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`
+    },
+    body: JSON.stringify({ name, email, password, role, color })
   });
-  if (error) throw error;
+
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.error || "Nu s-a putut adauga managerul.");
 }
 
 export async function createStage({ code, name, position }) {

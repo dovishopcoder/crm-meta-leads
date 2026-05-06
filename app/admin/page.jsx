@@ -10,7 +10,7 @@ export default function AdminPage() {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [managerForm, setManagerForm] = useState({ name: "", email: "", role: "manager", color: "#1e8f72" });
+  const [managerForm, setManagerForm] = useState({ name: "", email: "", password: "", role: "manager", color: "#1e8f72" });
   const [stageForm, setStageForm] = useState({ code: "", name: "", position: "" });
   const [productForm, setProductForm] = useState({ code: "", name: "" });
   const [editing, setEditing] = useState(null);
@@ -51,8 +51,8 @@ export default function AdminPage() {
 
   async function handleCreateManager(event) {
     event.preventDefault();
-    await submitAdminAction(() => createManager(managerForm), "Manager adaugat.");
-    setManagerForm({ name: "", email: "", role: "manager", color: "#1e8f72" });
+    await submitAdminAction(() => createManager(managerForm), "Manager adaugat si user creat in Supabase Auth.");
+    setManagerForm({ name: "", email: "", password: "", role: "manager", color: "#1e8f72" });
   }
 
   async function handleCreateStage(event) {
@@ -180,6 +180,7 @@ export default function AdminPage() {
           <form className="admin-form" onSubmit={handleCreateManager}>
             <input value={managerForm.name} onChange={(event) => setManagerForm({ ...managerForm, name: event.target.value })} placeholder="Nume" required />
             <input type="email" value={managerForm.email} onChange={(event) => setManagerForm({ ...managerForm, email: event.target.value })} placeholder="Email" required />
+            <input type="password" value={managerForm.password} onChange={(event) => setManagerForm({ ...managerForm, password: event.target.value })} placeholder="Parola temporara" minLength={6} required />
             <select value={managerForm.role} onChange={(event) => setManagerForm({ ...managerForm, role: event.target.value })}>
               <option value="manager">Manager</option>
               <option value="admin">Admin</option>
