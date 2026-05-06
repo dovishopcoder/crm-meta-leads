@@ -32,6 +32,7 @@ export function makeDefaultLeads() {
       platform: "instagram",
       avatar: "https://i.pravatar.cc/120?img=47",
       metaUrl: "https://business.facebook.com/latest/inbox/all?asset_id=demo-ana",
+      email: "",
       status: "new",
       unread: true,
       archived: false,
@@ -56,6 +57,7 @@ export function makeDefaultLeads() {
       platform: "facebook",
       avatar: "https://i.pravatar.cc/120?img=12",
       metaUrl: "https://business.facebook.com/latest/inbox/all?asset_id=demo-victor",
+      email: "",
       status: "new",
       unread: true,
       archived: false,
@@ -80,6 +82,7 @@ export function makeDefaultLeads() {
       platform: "instagram",
       avatar: "https://i.pravatar.cc/120?img=32",
       metaUrl: "https://business.facebook.com/latest/inbox/all?asset_id=demo-irina",
+      email: "",
       status: "scheduled",
       unread: false,
       archived: false,
@@ -104,6 +107,7 @@ export function makeDefaultLeads() {
       platform: "facebook",
       avatar: "https://i.pravatar.cc/120?img=68",
       metaUrl: "https://business.facebook.com/latest/inbox/all?asset_id=demo-mihai",
+      email: "",
       status: "new",
       unread: true,
       archived: false,
@@ -128,6 +132,7 @@ export function makeDefaultLeads() {
       platform: "instagram",
       avatar: "https://i.pravatar.cc/120?img=5",
       metaUrl: "https://business.facebook.com/latest/inbox/all?asset_id=demo-elena",
+      email: "",
       status: "contacted",
       unread: false,
       archived: false,
@@ -172,6 +177,7 @@ export function normalizeLead(lead) {
     lastProcessedAt: lead.lastProcessedAt || "",
     tagHistory: Array.isArray(lead.tagHistory) ? lead.tagHistory : [],
     products: Array.isArray(lead.products) ? lead.products.map((item) => (typeof item === "string" ? { id: item, status: "proposed", proposedAt: now, managerId: lead.managerId || "unassigned" } : item)) : [],
+    email: lead.email || "",
     activity: Array.isArray(lead.activity) ? lead.activity : []
   };
 }

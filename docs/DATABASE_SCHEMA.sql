@@ -35,6 +35,7 @@ create table leads (
   name text not null,
   avatar_url text,
   meta_url text,
+  email text,
   phone text,
   notes text,
   status text not null default 'new' check (status in ('new', 'scheduled', 'contacted', 'closed')),
@@ -118,4 +119,3 @@ insert into products (code, name) values
   ('health-prayer', 'Rugaciune sanatate'),
   ('meeting', 'Intalnire'),
   ('consultation', 'Consultatie');
-

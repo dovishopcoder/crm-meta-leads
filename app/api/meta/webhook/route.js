@@ -59,6 +59,7 @@ function normalizeWebhookPayload(payload) {
       name: payload.name || "Client Meta",
       platform: payload.platform || "facebook",
       avatarUrl: payload.avatar_url || "https://i.pravatar.cc/120?img=15",
+      email: payload.email || "",
       metaUrl: payload.meta_url || "https://business.facebook.com/latest/inbox/all",
       messageAt: payload.message_at || new Date().toISOString()
     }];
@@ -77,6 +78,7 @@ function normalizeWebhookPayload(payload) {
         name: value.sender?.name || value.from?.name || value.contact?.name || "Client Meta",
         platform: value.platform || change.field || payload.object || "facebook",
         avatarUrl: value.sender?.profile_pic || value.contact?.profile_pic || "https://i.pravatar.cc/120?img=15",
+        email: value.sender?.email || value.from?.email || value.contact?.email || "",
         metaUrl: value.meta_url || "https://business.facebook.com/latest/inbox/all",
         messageAt: value.timestamp ? new Date(Number(value.timestamp)).toISOString() : new Date().toISOString()
       });
@@ -91,6 +93,7 @@ function normalizeWebhookPayload(payload) {
         name: messaging.sender?.name || "Client Meta",
         platform: payload.object === "instagram" ? "instagram" : "facebook",
         avatarUrl: "https://i.pravatar.cc/120?img=15",
+        email: messaging.sender?.email || "",
         metaUrl: "https://business.facebook.com/latest/inbox/all",
         messageAt: messaging.timestamp ? new Date(Number(messaging.timestamp)).toISOString() : new Date().toISOString()
       });
@@ -105,7 +108,7 @@ async function enrichMessageProfile(message) {
 
   try {
     const url = new URL(`https://graph.facebook.com/v21.0/${message.metaContactId}`);
-    url.searchParams.set("fields", "first_name,last_name,name,profile_pic");
+    url.searchParams.set("fields", "first_name,last_name,name,profile_pic,email");
     url.searchParams.set("access_token", pageAccessToken);
 
     const response = await fetch(url);
@@ -117,7 +120,8 @@ async function enrichMessageProfile(message) {
     return {
       ...message,
       name: name || message.name,
-      avatarUrl: profile.profile_pic || message.avatarUrl
+      avatarUrl: profile.profile_pic || message.avatarUrl,
+      email: profile.email || message.email || ""
     };
   } catch {
     return message;
@@ -160,6 +164,7 @@ async function upsertLeadFromMessage(supabase, message) {
       name: message.name,
       avatar_url: message.avatarUrl,
       meta_url: message.metaUrl,
+      email: message.email || null,
       status: "new",
       priority: "normal",
       unread: true,
