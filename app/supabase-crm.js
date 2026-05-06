@@ -51,7 +51,7 @@ export async function loadAdminData() {
     supabase.from("products").select("id, code, name, active, created_at").order("created_at", { ascending: true }),
     supabase
       .from("leads")
-      .select("id, name, platform, email, meta_contact_id, first_message_at, archived_at, managers(name), stages(code, name), lead_tags(tag), lead_products(products(code, name))")
+      .select("id, name, platform, customer_email, meta_email, meta_contact_id, phone, first_message_at, archived_at, managers(name), stages(code, name), lead_tags(tag), lead_products(products(code, name))")
       .order("created_at", { ascending: false })
   ]);
 
@@ -200,7 +200,8 @@ export async function saveSupabaseLead(lead) {
     name: lead.name,
     avatar_url: lead.avatar,
     meta_url: lead.metaUrl,
-    email: lead.email || null,
+    email: lead.customerEmail || null,
+    customer_email: lead.customerEmail || null,
     phone: lead.phone || null,
     notes: lead.notes || null,
     status: lead.status,
@@ -299,6 +300,7 @@ function fromSupabaseLead(row, refs) {
     avatar: row.avatar_url || "",
     metaUrl: row.meta_url || "#",
     email: row.email || "",
+    customerEmail: row.customer_email || "",
     status: row.status,
     unread: row.unread,
     archived: Boolean(row.archived_at),
@@ -331,7 +333,9 @@ function toAudienceLead(row) {
     id: row.id,
     name: row.name,
     platform: row.platform,
-    email: row.email || "",
+    customerEmail: row.customer_email || "",
+    phone: row.phone || "",
+    metaEmail: row.meta_email || "",
     metaContactId: row.meta_contact_id || "",
     firstMessageAt: row.first_message_at || "",
     archived: Boolean(row.archived_at),

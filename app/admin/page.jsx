@@ -301,7 +301,7 @@ function AdminTable({ title, columns, rows, type, editing, editForm, onEdit, onE
 
 function AudienceTable({ leads, stages, managers, products, filters, onFiltersChange }) {
   const filteredLeads = leads.filter((lead) => {
-    if (!lead.email && !lead.metaContactId) return false;
+    if (!lead.metaEmail && !lead.metaContactId) return false;
     if (filters.status === "active" && lead.archived) return false;
     if (filters.status === "archived" && !lead.archived) return false;
     if (filters.stage !== "all" && lead.stageCode !== filters.stage) return false;
@@ -352,6 +352,8 @@ function AudienceTable({ leads, stages, managers, products, filters, onFiltersCh
               <th>Platforma</th>
               <th>Meta email</th>
               <th>Meta ID</th>
+              <th>Email client</th>
+              <th>Telefon</th>
               <th>Etapa</th>
               <th>Manager</th>
               <th>Produse</th>
@@ -362,14 +364,16 @@ function AudienceTable({ leads, stages, managers, products, filters, onFiltersCh
               <tr key={lead.id}>
                 <td>{lead.name}</td>
                 <td>{lead.platform}</td>
-                <td>{lead.email || "-"}</td>
+                <td>{lead.metaEmail || "-"}</td>
                 <td>{lead.metaContactId || "-"}</td>
+                <td>{lead.customerEmail || "-"}</td>
+                <td>{lead.phone || "-"}</td>
                 <td>{lead.stage}</td>
                 <td>{lead.manager}</td>
                 <td>{lead.products.length ? lead.products.join(", ") : "-"}</td>
               </tr>
             ))}
-            {!filteredLeads.length && <tr><td className="archive-empty" colSpan={7}>Nu exista contacte pentru filtrul ales.</td></tr>}
+            {!filteredLeads.length && <tr><td className="archive-empty" colSpan={9}>Nu exista contacte pentru filtrul ales.</td></tr>}
           </tbody>
         </table>
       </div>

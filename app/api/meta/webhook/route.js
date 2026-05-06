@@ -209,7 +209,7 @@ async function upsertLeadFromMessage(supabase, message) {
   const now = new Date().toISOString();
   const { data: existing, error: existingError } = await supabase
     .from("leads")
-    .select("id, name, platform, email")
+    .select("id, name, platform, meta_email")
     .eq("meta_contact_id", message.metaContactId)
     .maybeSingle();
 
@@ -221,7 +221,7 @@ async function upsertLeadFromMessage(supabase, message) {
       .update({
         name: message.name,
         avatar_url: message.avatarUrl,
-        email: message.email || existing.email || null,
+        meta_email: message.email || existing.meta_email || null,
         unread: true,
         last_message_at: message.messageAt || now,
         updated_at: now
@@ -244,7 +244,7 @@ async function upsertLeadFromMessage(supabase, message) {
       name: message.name,
       avatar_url: message.avatarUrl,
       meta_url: message.metaUrl,
-      email: message.email || null,
+      meta_email: message.email || null,
       status: "new",
       priority: "normal",
       unread: true,

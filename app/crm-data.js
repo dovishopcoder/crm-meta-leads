@@ -178,6 +178,7 @@ export function normalizeLead(lead) {
     tagHistory: Array.isArray(lead.tagHistory) ? lead.tagHistory : [],
     products: Array.isArray(lead.products) ? lead.products.map((item) => (typeof item === "string" ? { id: item, status: "proposed", proposedAt: now, managerId: lead.managerId || "unassigned" } : item)) : [],
     email: lead.email || "",
+    customerEmail: lead.customerEmail || "",
     activity: Array.isArray(lead.activity) ? lead.activity : []
   };
 }

@@ -36,6 +36,8 @@ create table leads (
   avatar_url text,
   meta_url text,
   email text,
+  meta_email text,
+  customer_email text,
   phone text,
   notes text,
   status text not null default 'new' check (status in ('new', 'scheduled', 'contacted', 'closed')),

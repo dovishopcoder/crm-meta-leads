@@ -290,6 +290,7 @@ export default function HomePage() {
       followDate: lead.followDate || "",
       stage: lead.stage || "new",
       tags: (lead.tags || []).join(", "),
+      customerEmail: lead.customerEmail || "",
       phone: lead.phone || "",
       notes: lead.notes || "",
       products: (lead.products || []).map((item) => item.id)
@@ -336,6 +337,7 @@ export default function HomePage() {
       lead.stage = draft.stage;
       lead.tags = draft.tags.split(",").map((tag) => tag.trim()).filter(Boolean);
       lead.products = selectedProducts;
+      lead.customerEmail = draft.customerEmail.trim();
       lead.phone = draft.phone.trim();
       lead.notes = draft.notes.trim();
       lead.processedCount = (lead.processedCount || 0) + 1;
@@ -394,6 +396,7 @@ export default function HomePage() {
         avatar: "https://i.pravatar.cc/120?img=25",
         metaUrl: "https://business.facebook.com/latest/inbox/all?asset_id=demo-sofia",
         email: "",
+        customerEmail: "",
         status: "new",
         unread: true,
         archived: false,
@@ -421,6 +424,7 @@ export default function HomePage() {
         avatar: "https://i.pravatar.cc/120?img=60",
         metaUrl: "https://business.facebook.com/latest/inbox/all?asset_id=demo-andrei",
         email: "",
+        customerEmail: "",
         status: "new",
         unread: true,
         archived: false,
@@ -752,7 +756,10 @@ function ClientModal({ lead, draft, warning, config, lookups, onChange, onClose,
 
           <ClientHistory lead={lead} lookups={lookups} />
 
-          <label>Telefon / contact extra<input value={draft.phone} onChange={(event) => update("phone", event.target.value)} placeholder="+373..." /></label>
+          <div className="field-grid">
+            <label>Email client<input value={draft.customerEmail} onChange={(event) => update("customerEmail", event.target.value)} placeholder="email oferit de client" /></label>
+            <label>Telefon / contact extra<input value={draft.phone} onChange={(event) => update("phone", event.target.value)} placeholder="+373..." /></label>
+          </div>
           <label>Comentarii<textarea value={draft.notes} onChange={(event) => update("notes", event.target.value)} rows={5} placeholder="Note interne despre client" /></label>
           {warning && <p className="modal-warning">{warning}</p>}
 
@@ -950,6 +957,7 @@ function normalizeLead(lead) {
     unread: lead.unread ?? lead.status === "new",
     managerId: lead.managerId || "unassigned",
     priority: lead.priority || "normal",
+    customerEmail: lead.customerEmail || "",
     stage: lead.stage || "new",
     createdAt: lead.createdAt || now,
     firstMessageAt: lead.firstMessageAt || lead.createdAt || now,
