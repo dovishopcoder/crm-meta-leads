@@ -142,6 +142,9 @@ async function upsertLeadFromMessage(supabase, message) {
     const { data, error } = await supabase
       .from("leads")
       .update({
+        name: message.name,
+        avatar_url: message.avatarUrl,
+        email: message.email || null,
         unread: true,
         last_message_at: message.messageAt || now,
         updated_at: now
