@@ -45,6 +45,8 @@ Pentru verificarea webhook-ului de catre Meta.
 
 Pentru primirea evenimentelor noi.
 
+Endpoint-ul foloseste optional `META_PAGE_ACCESS_TOKEN` pentru a incerca preluarea numelui si pozei clientului din Graph API pe baza sender id-ului.
+
 ### POST /api/leads/:id/process
 
 Pentru salvarea procesarii de catre manager:
@@ -79,4 +81,3 @@ Vor fi necesare conturi si configurari in Meta Developer:
 - Webhooks pentru mesaje;
 - permisiuni pentru Messenger / Instagram Messaging;
 - proces de review Meta pentru productie.
-

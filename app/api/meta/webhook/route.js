@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const verifyToken = process.env.META_VERIFY_TOKEN;
+const pageAccessToken = process.env.META_PAGE_ACCESS_TOKEN;
 
 function serverSupabase() {
   if (!supabaseUrl || !serviceRoleKey) {
@@ -43,7 +44,8 @@ export async function POST(request) {
   const processed = [];
 
   for (const message of messages) {
-    const lead = await upsertLeadFromMessage(supabase, message);
+    const enrichedMessage = await enrichMessageProfile(message);
+    const lead = await upsertLeadFromMessage(supabase, enrichedMessage);
     processed.push({ id: lead.id, name: lead.name, platform: lead.platform });
   }
 
@@ -96,6 +98,30 @@ function normalizeWebhookPayload(payload) {
   }
 
   return messages;
+}
+
+async function enrichMessageProfile(message) {
+  if (!pageAccessToken || !message.metaContactId) return message;
+
+  try {
+    const url = new URL(`https://graph.facebook.com/v21.0/${message.metaContactId}`);
+    url.searchParams.set("fields", "first_name,last_name,name,profile_pic");
+    url.searchParams.set("access_token", pageAccessToken);
+
+    const response = await fetch(url);
+    if (!response.ok) return message;
+
+    const profile = await response.json();
+    const name = profile.name || [profile.first_name, profile.last_name].filter(Boolean).join(" ");
+
+    return {
+      ...message,
+      name: name || message.name,
+      avatarUrl: profile.profile_pic || message.avatarUrl
+    };
+  } catch {
+    return message;
+  }
 }
 
 async function upsertLeadFromMessage(supabase, message) {
