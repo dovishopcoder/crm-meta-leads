@@ -124,6 +124,29 @@
   border: 0;
 }
 
+.audience-card {
+  margin-top: 14px;
+}
+
+.audience-filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.audience-filters select {
+  min-height: 42px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.audience-table {
+  min-width: 980px;
+}
+
 .admin-form {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -391,6 +414,7 @@
   .product-grid,
   .client-meta-grid,
   .admin-form,
+  .audience-filters,
   .transfer-box {
     grid-template-columns: 1fr;
   }

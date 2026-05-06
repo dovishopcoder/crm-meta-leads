@@ -16,6 +16,7 @@ export default function AdminPage() {
   const [editing, setEditing] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [transferPrompt, setTransferPrompt] = useState(null);
+  const [audienceFilters, setAudienceFilters] = useState({ stage: "all", manager: "all", product: "all", status: "active" });
 
   useEffect(() => {
     async function load() {
@@ -243,6 +244,15 @@ export default function AdminPage() {
           />
         </section>
       </div>
+
+      <AudienceTable
+        leads={adminData.audienceLeads || []}
+        stages={adminData.stages}
+        managers={adminData.managers}
+        products={adminData.products}
+        filters={audienceFilters}
+        onFiltersChange={setAudienceFilters}
+      />
     </main>
   );
 }
@@ -285,6 +295,84 @@ function AdminTable({ title, columns, rows, type, editing, editForm, onEdit, onE
           {!rows.length && <tr><td className="archive-empty" colSpan={columns.length + 1}>Nu exista date.</td></tr>}
         </tbody>
       </table>
+    </section>
+  );
+}
+
+function AudienceTable({ leads, stages, managers, products, filters, onFiltersChange }) {
+  const filteredLeads = leads.filter((lead) => {
+    if (!lead.email && !lead.metaContactId) return false;
+    if (filters.status === "active" && lead.archived) return false;
+    if (filters.status === "archived" && !lead.archived) return false;
+    if (filters.stage !== "all" && lead.stageCode !== filters.stage) return false;
+    if (filters.manager !== "all" && lead.manager !== filters.manager) return false;
+    if (filters.product !== "all" && !lead.products.includes(filters.product)) return false;
+    return true;
+  });
+
+  function updateFilter(field, value) {
+    onFiltersChange({ ...filters, [field]: value });
+  }
+
+  return (
+    <section className="admin-card audience-card">
+      <div className="archive-head">
+        <div>
+          <p className="eyebrow">Meta custom audience</p>
+          <h3>Date tehnice pentru admin</h3>
+        </div>
+        <span className="count-badge">{filteredLeads.length}</span>
+      </div>
+
+      <div className="audience-filters">
+        <select value={filters.stage} onChange={(event) => updateFilter("stage", event.target.value)}>
+          <option value="all">Toate etapele</option>
+          {stages.map((stage) => <option key={stage.id} value={stage.code}>{stage.name}</option>)}
+        </select>
+        <select value={filters.manager} onChange={(event) => updateFilter("manager", event.target.value)}>
+          <option value="all">Toti managerii</option>
+          {managers.map((manager) => <option key={manager.id} value={manager.name}>{manager.name}</option>)}
+        </select>
+        <select value={filters.product} onChange={(event) => updateFilter("product", event.target.value)}>
+          <option value="all">Toate produsele</option>
+          {products.map((product) => <option key={product.id} value={product.name}>{product.name}</option>)}
+        </select>
+        <select value={filters.status} onChange={(event) => updateFilter("status", event.target.value)}>
+          <option value="active">Doar active</option>
+          <option value="archived">Doar arhivate</option>
+          <option value="all">Toate</option>
+        </select>
+      </div>
+
+      <div className="archive-table-wrap">
+        <table className="archive-table audience-table">
+          <thead>
+            <tr>
+              <th>Client</th>
+              <th>Platforma</th>
+              <th>Meta email</th>
+              <th>Meta ID</th>
+              <th>Etapa</th>
+              <th>Manager</th>
+              <th>Produse</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredLeads.map((lead) => (
+              <tr key={lead.id}>
+                <td>{lead.name}</td>
+                <td>{lead.platform}</td>
+                <td>{lead.email || "-"}</td>
+                <td>{lead.metaContactId || "-"}</td>
+                <td>{lead.stage}</td>
+                <td>{lead.manager}</td>
+                <td>{lead.products.length ? lead.products.join(", ") : "-"}</td>
+              </tr>
+            ))}
+            {!filteredLeads.length && <tr><td className="archive-empty" colSpan={7}>Nu exista contacte pentru filtrul ales.</td></tr>}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }

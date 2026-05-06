@@ -221,7 +221,7 @@ export default function HomePage() {
       if (activeFilter !== "all" && lead.platform !== activeFilter) return false;
       if (onlyMyLeads && lead.managerId !== currentManagerCode) return false;
       if (managerFilter !== "all" && lead.managerId !== managerFilter) return false;
-      const haystack = [lead.name, lead.email, lead.platform, lead.status, lead.phone, lead.notes, managerForConfig(lead.managerId).name, ...(lead.tags || [])]
+      const haystack = [lead.name, lead.platform, lead.status, lead.phone, lead.notes, managerForConfig(lead.managerId).name, ...(lead.tags || [])]
         .join(" ")
         .toLowerCase();
       return haystack.includes(search.toLowerCase());
@@ -290,7 +290,6 @@ export default function HomePage() {
       followDate: lead.followDate || "",
       stage: lead.stage || "new",
       tags: (lead.tags || []).join(", "),
-      email: lead.email || "",
       phone: lead.phone || "",
       notes: lead.notes || "",
       products: (lead.products || []).map((item) => item.id)
@@ -337,7 +336,6 @@ export default function HomePage() {
       lead.stage = draft.stage;
       lead.tags = draft.tags.split(",").map((tag) => tag.trim()).filter(Boolean);
       lead.products = selectedProducts;
-      lead.email = draft.email.trim();
       lead.phone = draft.phone.trim();
       lead.notes = draft.notes.trim();
       lead.processedCount = (lead.processedCount || 0) + 1;
@@ -754,10 +752,7 @@ function ClientModal({ lead, draft, warning, config, lookups, onChange, onClose,
 
           <ClientHistory lead={lead} lookups={lookups} />
 
-          <div className="field-grid">
-            <label>Email<input value={draft.email} onChange={(event) => update("email", event.target.value)} placeholder="email@exemplu.com" /></label>
-            <label>Telefon / contact extra<input value={draft.phone} onChange={(event) => update("phone", event.target.value)} placeholder="+373..." /></label>
-          </div>
+          <label>Telefon / contact extra<input value={draft.phone} onChange={(event) => update("phone", event.target.value)} placeholder="+373..." /></label>
           <label>Comentarii<textarea value={draft.notes} onChange={(event) => update("notes", event.target.value)} rows={5} placeholder="Note interne despre client" /></label>
           {warning && <p className="modal-warning">{warning}</p>}
 

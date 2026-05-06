@@ -45,20 +45,26 @@ export async function loadCurrentManager() {
 export async function loadAdminData() {
   if (!supabase) throw new Error("Supabase nu este configurat.");
 
-  const [managerResult, stageResult, productResult] = await Promise.all([
+  const [managerResult, stageResult, productResult, audienceResult] = await Promise.all([
     supabase.from("managers").select("id, name, email, role, color, active, created_at").order("created_at", { ascending: true }),
     supabase.from("stages").select("id, code, name, position, active, created_at").order("position", { ascending: true }),
-    supabase.from("products").select("id, code, name, active, created_at").order("created_at", { ascending: true })
+    supabase.from("products").select("id, code, name, active, created_at").order("created_at", { ascending: true }),
+    supabase
+      .from("leads")
+      .select("id, name, platform, email, meta_contact_id, first_message_at, archived_at, managers(name), stages(code, name), lead_tags(tag), lead_products(products(code, name))")
+      .order("created_at", { ascending: false })
   ]);
 
   if (managerResult.error) throw managerResult.error;
   if (stageResult.error) throw stageResult.error;
   if (productResult.error) throw productResult.error;
+  if (audienceResult.error) throw audienceResult.error;
 
   return {
     managers: managerResult.data || [],
     stages: stageResult.data || [],
-    products: productResult.data || []
+    products: productResult.data || [],
+    audienceLeads: (audienceResult.data || []).map(toAudienceLead)
   };
 }
 
@@ -317,6 +323,23 @@ function fromSupabaseLead(row, refs) {
     phone: row.phone || "",
     notes: row.notes || "",
     followDate: row.follow_up_at || ""
+  };
+}
+
+function toAudienceLead(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    platform: row.platform,
+    email: row.email || "",
+    metaContactId: row.meta_contact_id || "",
+    firstMessageAt: row.first_message_at || "",
+    archived: Boolean(row.archived_at),
+    manager: row.managers?.name || "Neatribuit",
+    stage: row.stages?.name || "Fara etapa",
+    stageCode: row.stages?.code || "",
+    tags: (row.lead_tags || []).map((tag) => tag.tag),
+    products: (row.lead_products || []).map((item) => item.products?.name).filter(Boolean)
   };
 }
 
