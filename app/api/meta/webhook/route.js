@@ -170,7 +170,6 @@ function buildMetaConversationUrl(pageId, conversationId) {
   }
   if (conversationId) {
     url.searchParams.set("selected_item_id", conversationId);
-    url.searchParams.set("thread_type", "FB_MESSAGE");
   }
   return url.toString();
 }
