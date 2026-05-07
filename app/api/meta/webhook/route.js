@@ -155,7 +155,7 @@ async function enrichMessageParticipants(message) {
       ...message,
       name: participant?.name || message.name,
       email: participant?.email || message.email || "",
-      metaUrl: buildMetaConversationUrl(message.pageId, participant?.id || conversation.id)
+      metaUrl: buildMetaConversationUrl(message.pageId, conversation.id)
     };
   } catch {
     return message;
@@ -169,13 +169,25 @@ function buildMetaConversationUrl(pageId, conversationId) {
     url.searchParams.set("mailbox_id", pageId);
   }
   if (conversationId) {
-    url.searchParams.set("selected_item_id", conversationId);
+    url.searchParams.set("selected_item_id", normalizeSelectedItemId(conversationId));
     url.searchParams.set("thread_type", "FB_MESSAGE");
   }
   return url.toString();
 }
 
 async function findConversationForContact(pageId, contactId) {
+  const contactUrl = new URL(`https://graph.facebook.com/${graphVersion}/${contactId}/conversations`);
+  contactUrl.searchParams.set("fields", "id,participants,updated_time");
+  contactUrl.searchParams.set("limit", "5");
+  contactUrl.searchParams.set("access_token", pageAccessToken);
+
+  const contactResponse = await fetch(contactUrl);
+  if (contactResponse.ok) {
+    const contactData = await contactResponse.json();
+    const contactConversation = findConversationWithContact(contactData.data || [], contactId, pageId) || contactData.data?.[0];
+    if (contactConversation) return contactConversation;
+  }
+
   const directUrl = new URL(`https://graph.facebook.com/${graphVersion}/${pageId}/conversations`);
   directUrl.searchParams.set("fields", "participants");
   directUrl.searchParams.set("user_id", contactId);
@@ -199,6 +211,10 @@ async function findConversationForContact(pageId, contactId) {
 
   const listData = await listResponse.json();
   return findConversationWithContact(listData.data || [], contactId, pageId);
+}
+
+function normalizeSelectedItemId(value) {
+  return String(value || "").replace(/^t_/, "");
 }
 
 function findConversationWithContact(conversations, contactId, pageId) {
@@ -285,7 +301,7 @@ function chooseMetaUrl(existingUrl, generatedUrl, contactId) {
     const existingSelectedId = existing.searchParams.get("selected_item_id");
     const generatedSelectedId = generated.searchParams.get("selected_item_id");
 
-    if (existingSelectedId && existingSelectedId !== contactId && existingSelectedId !== generatedSelectedId) {
+    if (existingSelectedId && generatedSelectedId === contactId && existingSelectedId !== generatedSelectedId) {
       return existingUrl;
     }
   } catch {
