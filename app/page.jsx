@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AppNav } from "./components";
-import { getCurrentSession, loadCrmConfig, loadCurrentManager, loadSupabaseLeads, saveSupabaseLead } from "./supabase-crm";
+import { getCurrentSession, loadCrmConfig, loadCurrentManager, loadSupabaseLeads, saveSupabaseLead, sendMetaMessage } from "./supabase-crm";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const FALLBACK_MANAGER_ID = "diana";
@@ -170,6 +170,9 @@ export default function HomePage() {
   const [selectedId, setSelectedId] = useState(null);
   const [modalSource, setModalSource] = useState("direct");
   const [draft, setDraft] = useState(null);
+  const [replyText, setReplyText] = useState("");
+  const [replyState, setReplyState] = useState("idle");
+  const [replyError, setReplyError] = useState("");
   const [warning, setWarning] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
   const [managerFilter, setManagerFilter] = useState("all");
@@ -283,6 +286,9 @@ export default function HomePage() {
     setSelectedId(lead.id);
     setModalSource(source);
     setWarning("");
+    setReplyText("");
+    setReplyState("idle");
+    setReplyError("");
     setDraft({
       status: lead.status,
       managerId: lead.managerId || "unassigned",
@@ -507,6 +513,32 @@ export default function HomePage() {
     }));
   }
 
+  async function sendSelectedReply() {
+    if (!selectedLead || !replyText.trim()) return;
+
+    setReplyState("sending");
+    setReplyError("");
+    try {
+      await sendMetaMessage({ leadId: selectedLead.id, text: replyText.trim() });
+      const sentText = replyText.trim();
+      const now = toIso(new Date());
+      setReplyText("");
+      setReplyState("sent");
+      setLeads((current) => current.map((lead) => lead.id === selectedLead.id
+        ? {
+          ...lead,
+          unread: false,
+          lastProcessedAt: now,
+          activity: [...(lead.activity || []), { type: "outgoing_message", at: now, managerId: lead.managerId, text: sentText }]
+        }
+        : lead));
+      window.setTimeout(() => setReplyState("idle"), 1600);
+    } catch (error) {
+      setReplyError(error.message || "Mesajul nu a putut fi trimis.");
+      setReplyState("error");
+    }
+  }
+
   if (!loaded) return null;
 
   return (
@@ -628,11 +660,16 @@ export default function HomePage() {
         <ClientModal
           lead={selectedLead}
           draft={draft}
+          replyText={replyText}
+          replyState={replyState}
+          replyError={replyError}
           warning={warning}
           config={{ managers: activeManagers, stages: activeStages, products: activeProducts }}
           isAdmin={currentManager?.role === "admin"}
           lookups={{ managerForConfig, stageForConfig, productForConfig }}
           onChange={setDraft}
+          onReplyTextChange={setReplyText}
+          onSendReply={sendSelectedReply}
           onClose={closeModal}
           onArchive={archiveSelectedLead}
           onSchedule={() => {
@@ -702,7 +739,7 @@ function EventCard({ lead, lookups, onOpen, onIncoming, onDragStart }) {
   );
 }
 
-function ClientModal({ lead, draft, warning, config, isAdmin, lookups, onChange, onClose, onArchive, onSchedule, onSave }) {
+function ClientModal({ lead, draft, replyText, replyState, replyError, warning, config, isAdmin, lookups, onChange, onReplyTextChange, onSendReply, onClose, onArchive, onSchedule, onSave }) {
   function update(field, value) {
     onChange({ ...draft, [field]: value });
   }
@@ -769,6 +806,18 @@ function ClientModal({ lead, draft, warning, config, isAdmin, lookups, onChange,
             <label>Link Meta verificat<input value={draft.metaUrl} onChange={(event) => update("metaUrl", event.target.value)} placeholder="https://business.facebook.com/latest/inbox/all?..." /></label>
           )}
           <label>Comentarii<textarea value={draft.notes} onChange={(event) => update("notes", event.target.value)} rows={5} placeholder="Note interne despre client" /></label>
+
+          <div className="modal-section">
+            <p className="eyebrow">Raspuns Meta</p>
+            <textarea value={replyText} onChange={(event) => onReplyTextChange(event.target.value)} rows={3} placeholder="Scrie mesajul catre client" />
+            {lead.platform !== "facebook" && <p className="empty-history">Trimiterea directa este activa momentan pentru Facebook Messenger.</p>}
+            {replyError && <p className="modal-warning">{replyError}</p>}
+            <div className="table-actions">
+              <button type="button" className="primary-btn" onClick={onSendReply} disabled={lead.platform !== "facebook" || !replyText.trim() || replyState === "sending"}>
+                {replyState === "sending" ? "Se trimite..." : replyState === "sent" ? "Trimis" : "Trimite in Messenger"}
+              </button>
+            </div>
+          </div>
           {warning && <p className="modal-warning">{warning}</p>}
 
           <div className="modal-actions">
