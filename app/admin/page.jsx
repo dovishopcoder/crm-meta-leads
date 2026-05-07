@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AppNav } from "../components";
-import { countActiveLeadsForManager, createManager, createProduct, createStage, debugMetaConversation, getCurrentSession, loadAdminData, loadCurrentManager, transferActiveLeads, updateManager, updateProduct, updateStage } from "../supabase-crm";
+import { countActiveLeadsForManager, createManager, createProduct, createStage, getCurrentSession, loadAdminData, loadCurrentManager, transferActiveLeads, updateManager, updateProduct, updateStage } from "../supabase-crm";
 
 export default function AdminPage() {
   const [currentManager, setCurrentManager] = useState(null);
@@ -17,8 +17,6 @@ export default function AdminPage() {
   const [editForm, setEditForm] = useState({});
   const [transferPrompt, setTransferPrompt] = useState(null);
   const [audienceFilters, setAudienceFilters] = useState({ stage: "all", manager: "all", product: "all", status: "active" });
-  const [metaDebugForm, setMetaDebugForm] = useState({ pageId: "228763047857569", contactId: "9778373752196744" });
-  const [metaDebugResult, setMetaDebugResult] = useState(null);
 
   useEffect(() => {
     async function load() {
@@ -139,19 +137,6 @@ export default function AdminPage() {
     setEditForm({});
   }
 
-  async function runMetaDebug(event) {
-    event.preventDefault();
-    setError("");
-    setMessage("");
-    setMetaDebugResult(null);
-
-    try {
-      setMetaDebugResult(await debugMetaConversation(metaDebugForm));
-    } catch (err) {
-      setError(err.message || "Nu s-a putut rula debug Meta.");
-    }
-  }
-
   if (!loaded) return null;
 
   return (
@@ -270,20 +255,6 @@ export default function AdminPage() {
         onFiltersChange={setAudienceFilters}
       />
 
-      <section className="admin-card audience-card">
-        <div className="archive-head">
-          <div>
-            <p className="eyebrow">Debug temporar</p>
-            <h3>Meta conversation link</h3>
-          </div>
-        </div>
-        <form className="admin-form debug-form" onSubmit={runMetaDebug}>
-          <input value={metaDebugForm.pageId} onChange={(event) => setMetaDebugForm({ ...metaDebugForm, pageId: event.target.value })} placeholder="Page ID" required />
-          <input value={metaDebugForm.contactId} onChange={(event) => setMetaDebugForm({ ...metaDebugForm, contactId: event.target.value })} placeholder="PSID / contact ID" required />
-          <button className="primary-btn" type="submit">Ruleaza debug</button>
-        </form>
-        {metaDebugResult && <MetaDebugResult result={metaDebugResult} />}
-      </section>
     </main>
   );
 }
@@ -409,23 +380,6 @@ function AudienceTable({ leads, stages, managers, products, filters, onFiltersCh
         </table>
       </div>
     </section>
-  );
-}
-
-function MetaDebugResult({ result }) {
-  return (
-    <div className="debug-result">
-      <p>Conversatii gasite: {result.matches?.length || 0}</p>
-      <div className="debug-links">
-        {(result.links || []).map((link) => (
-          <a key={`${link.label}-${link.selectedItemId}`} href={link.url} target="_blank" rel="noreferrer">
-            {link.label}: {link.selectedItemId}
-          </a>
-        ))}
-        {!result.links?.length && <span>Nu au fost generate linkuri.</span>}
-      </div>
-      <pre>{JSON.stringify(result, null, 2)}</pre>
-    </div>
   );
 }
 

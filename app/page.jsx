@@ -290,6 +290,7 @@ export default function HomePage() {
       followDate: lead.followDate || "",
       stage: lead.stage || "new",
       tags: (lead.tags || []).join(", "),
+      metaUrl: lead.metaUrl || "",
       customerEmail: lead.customerEmail || "",
       phone: lead.phone || "",
       notes: lead.notes || "",
@@ -337,6 +338,9 @@ export default function HomePage() {
       lead.stage = draft.stage;
       lead.tags = draft.tags.split(",").map((tag) => tag.trim()).filter(Boolean);
       lead.products = selectedProducts;
+      if (currentManager?.role === "admin") {
+        lead.metaUrl = draft.metaUrl.trim() || lead.metaUrl;
+      }
       lead.customerEmail = draft.customerEmail.trim();
       lead.phone = draft.phone.trim();
       lead.notes = draft.notes.trim();
@@ -626,6 +630,7 @@ export default function HomePage() {
           draft={draft}
           warning={warning}
           config={{ managers: activeManagers, stages: activeStages, products: activeProducts }}
+          isAdmin={currentManager?.role === "admin"}
           lookups={{ managerForConfig, stageForConfig, productForConfig }}
           onChange={setDraft}
           onClose={closeModal}
@@ -697,7 +702,7 @@ function EventCard({ lead, lookups, onOpen, onIncoming, onDragStart }) {
   );
 }
 
-function ClientModal({ lead, draft, warning, config, lookups, onChange, onClose, onArchive, onSchedule, onSave }) {
+function ClientModal({ lead, draft, warning, config, isAdmin, lookups, onChange, onClose, onArchive, onSchedule, onSave }) {
   function update(field, value) {
     onChange({ ...draft, [field]: value });
   }
@@ -760,6 +765,9 @@ function ClientModal({ lead, draft, warning, config, lookups, onChange, onClose,
             <label>Email client<input value={draft.customerEmail} onChange={(event) => update("customerEmail", event.target.value)} placeholder="email oferit de client" /></label>
             <label>Telefon / contact extra<input value={draft.phone} onChange={(event) => update("phone", event.target.value)} placeholder="+373..." /></label>
           </div>
+          {isAdmin && (
+            <label>Link Meta verificat<input value={draft.metaUrl} onChange={(event) => update("metaUrl", event.target.value)} placeholder="https://business.facebook.com/latest/inbox/all?..." /></label>
+          )}
           <label>Comentarii<textarea value={draft.notes} onChange={(event) => update("notes", event.target.value)} rows={5} placeholder="Note interne despre client" /></label>
           {warning && <p className="modal-warning">{warning}</p>}
 
