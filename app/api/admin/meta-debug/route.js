@@ -47,13 +47,13 @@ export async function GET(request) {
     }
 
     const direct = await graph(`${pageId}/conversations`, {
-      fields: "id,link,participants,updated_time",
+      fields: "id,link,participants,updated_time,snippet,senders,scoped_thread_key,message_count,unread_count,can_reply,is_subscribed",
       user_id: contactId,
       limit: "10"
     });
 
     const listed = await graph(`${pageId}/conversations`, {
-      fields: "id,link,participants,updated_time",
+      fields: "id,link,participants,updated_time,snippet,senders,scoped_thread_key,message_count,unread_count,can_reply,is_subscribed",
       limit: "25"
     });
 
@@ -82,6 +82,26 @@ export async function GET(request) {
       ].filter(Boolean);
     });
 
+    const matchDetails = await Promise.all(matches.map(async (conversation) => {
+      const [conversationDetails, messages] = await Promise.all([
+        graph(conversation.id, {
+          fields: "id,link,participants,senders,scoped_thread_key,messages.limit(5){id,from,to,created_time,message},updated_time,message_count,unread_count,can_reply,is_subscribed"
+        }),
+        graph(`${conversation.id}/messages`, {
+          fields: "id,from,to,created_time,message",
+          limit: "5"
+        })
+      ]);
+
+      return {
+        conversationId: conversation.id,
+        conversationDetailsStatus: conversationDetails.status,
+        conversationDetails: redactAccessToken(conversationDetails.data),
+        messagesStatus: messages.status,
+        messages: redactAccessToken(messages.data)
+      };
+    }));
+
     return NextResponse.json({
       ok: true,
       graphVersion,
@@ -95,6 +115,7 @@ export async function GET(request) {
         id: conversation.id,
         link: conversation.link || null,
         updatedTime: conversation.updated_time || null,
+        raw: redactAccessToken(conversation),
         participants: (conversation.participants?.data || []).map((participant) => ({
           id: participant.id || null,
           name: participant.name || null,
@@ -106,11 +127,19 @@ export async function GET(request) {
           email: conversation.clientParticipant.email || null
         } : null
       })),
-      links
+      links,
+      matchDetails
     });
   } catch (error) {
     return NextResponse.json({ error: error.message || "Debug Meta a esuat." }, { status: 500 });
   }
+}
+
+function redactAccessToken(value) {
+  return JSON.parse(JSON.stringify(value, (key, item) => {
+    if (key.toLowerCase().includes("token")) return "[redacted]";
+    return item;
+  }));
 }
 
 async function graph(path, params) {
