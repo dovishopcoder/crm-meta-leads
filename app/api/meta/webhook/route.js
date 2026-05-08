@@ -183,7 +183,7 @@ function normalizeMetaConversationLink(link) {
   if (!link) return "";
 
   try {
-    const url = new URL(link);
+    const url = new URL(link, "https://business.facebook.com");
     if (url.hostname !== "business.facebook.com") return link;
     if (!url.searchParams.get("thread_type") && url.searchParams.get("selected_item_id")) {
       url.searchParams.set("thread_type", "FB_MESSAGE");
