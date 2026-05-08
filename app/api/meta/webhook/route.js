@@ -185,6 +185,12 @@ function normalizeMetaConversationLink(link) {
   try {
     const url = new URL(link, "https://business.facebook.com");
     if (url.hostname !== "business.facebook.com") return link;
+
+    const inboxMatch = url.pathname.match(/^\/([^/]+)\/inbox\/([^/]+)/);
+    if (inboxMatch) {
+      return buildMetaConversationUrl(inboxMatch[1], inboxMatch[2]);
+    }
+
     if (!url.searchParams.get("thread_type") && url.searchParams.get("selected_item_id")) {
       url.searchParams.set("thread_type", "FB_MESSAGE");
     }
