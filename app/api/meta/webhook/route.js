@@ -151,11 +151,15 @@ async function enrichMessageParticipants(message) {
     const data = await response.json();
     const participant = findClientParticipant(data.participants?.data || [], message.metaContactId, message.pageId);
 
+    const conversationLink = normalizeMetaConversationLink(conversation.link);
+
     return {
       ...message,
       name: participant?.name || message.name,
       email: participant?.email || message.email || "",
-      metaUrl: buildMetaConversationUrl(message.pageId, conversation.id)
+      metaUrl: conversationLink || buildMetaConversationUrl(message.pageId, conversation.id),
+      metaUrlSource: conversationLink ? "conversation_link" : "generated_from_conversation_id",
+      metaConversationId: conversation.id
     };
   } catch {
     return message;
@@ -175,9 +179,24 @@ function buildMetaConversationUrl(pageId, conversationId) {
   return url.toString();
 }
 
+function normalizeMetaConversationLink(link) {
+  if (!link) return "";
+
+  try {
+    const url = new URL(link);
+    if (url.hostname !== "business.facebook.com") return link;
+    if (!url.searchParams.get("thread_type") && url.searchParams.get("selected_item_id")) {
+      url.searchParams.set("thread_type", "FB_MESSAGE");
+    }
+    return url.toString();
+  } catch {
+    return link;
+  }
+}
+
 async function findConversationForContact(pageId, contactId) {
   const contactUrl = new URL(`https://graph.facebook.com/${graphVersion}/${contactId}/conversations`);
-  contactUrl.searchParams.set("fields", "id,participants,updated_time");
+  contactUrl.searchParams.set("fields", "id,link,participants,updated_time");
   contactUrl.searchParams.set("limit", "5");
   contactUrl.searchParams.set("access_token", pageAccessToken);
 
@@ -189,7 +208,7 @@ async function findConversationForContact(pageId, contactId) {
   }
 
   const directUrl = new URL(`https://graph.facebook.com/${graphVersion}/${pageId}/conversations`);
-  directUrl.searchParams.set("fields", "participants");
+  directUrl.searchParams.set("fields", "id,link,participants,updated_time");
   directUrl.searchParams.set("user_id", contactId);
   directUrl.searchParams.set("limit", "5");
   directUrl.searchParams.set("access_token", pageAccessToken);
@@ -202,7 +221,7 @@ async function findConversationForContact(pageId, contactId) {
   }
 
   const listUrl = new URL(`https://graph.facebook.com/${graphVersion}/${pageId}/conversations`);
-  listUrl.searchParams.set("fields", "participants");
+  listUrl.searchParams.set("fields", "id,link,participants,updated_time");
   listUrl.searchParams.set("limit", "25");
   listUrl.searchParams.set("access_token", pageAccessToken);
 
@@ -262,7 +281,11 @@ async function upsertLeadFromMessage(supabase, message) {
       .single();
 
     if (error) throw error;
-    await insertActivity(supabase, existing.id, "incoming_message", { source: "meta_webhook" });
+    await insertActivity(supabase, existing.id, "incoming_message", {
+      source: "meta_webhook",
+      metaUrlSource: message.metaUrlSource || null,
+      metaConversationId: message.metaConversationId || null
+    });
     return data;
   }
 
@@ -288,7 +311,12 @@ async function upsertLeadFromMessage(supabase, message) {
     .single();
 
   if (error) throw error;
-  await insertActivity(supabase, data.id, "incoming_message", { source: "meta_webhook", created: true });
+  await insertActivity(supabase, data.id, "incoming_message", {
+    source: "meta_webhook",
+    created: true,
+    metaUrlSource: message.metaUrlSource || null,
+    metaConversationId: message.metaConversationId || null
+  });
   return data;
 }
 
