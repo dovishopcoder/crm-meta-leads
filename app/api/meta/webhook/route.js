@@ -167,7 +167,7 @@ async function enrichMessageParticipants(message) {
 }
 
 function buildMetaConversationUrl(pageId, conversationId) {
-  const url = new URL("https://business.facebook.com/latest/inbox/messenger");
+  const url = new URL("https://business.facebook.com/latest/inbox/all");
   if (pageId) {
     url.searchParams.set("asset_id", pageId);
     url.searchParams.set("mailbox_id", pageId);
