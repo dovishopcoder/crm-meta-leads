@@ -649,11 +649,6 @@ export default function HomePage() {
           onChange={setDraft}
           onClose={closeModal}
           onArchive={archiveSelectedLead}
-          onSchedule={() => {
-            const nextDraft = { ...draft, followDate: draft.followDate || addDaysKey(new Date(), 1) };
-            setDraft(nextDraft);
-            setTimeout(saveSelectedLead, 0);
-          }}
           onSave={saveSelectedLead}
         />
       )}
@@ -724,7 +719,7 @@ function Avatar({ lead, className = "" }) {
   return <img className={className || "avatar"} src={avatarSrc(lead.avatar)} alt="" onError={() => setFailed(true)} />;
 }
 
-function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning, config, isAdmin, lookups, onChange, onClose, onArchive, onSchedule, onSave }) {
+function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning, config, isAdmin, lookups, onChange, onClose, onArchive, onSave }) {
   function update(field, value) {
     onChange({ ...draft, [field]: value });
   }
@@ -818,7 +813,6 @@ function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning,
 
           <div className="modal-actions">
             <button type="button" className="danger-btn" onClick={onArchive}>Arhiveaza</button>
-            <button type="button" className="ghost-btn" onClick={onSchedule}>Programeaza</button>
             <button type="submit" className="primary-btn">Salveaza</button>
           </div>
             </>
