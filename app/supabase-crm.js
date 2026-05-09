@@ -68,6 +68,51 @@ export async function loadAdminData() {
   };
 }
 
+export async function loadProjectChecklistTasks() {
+  if (!supabase) throw new Error("Supabase nu este configurat.");
+
+  const { data, error } = await supabase
+    .from("project_checklist_tasks")
+    .select("id, section, title, done, created_at")
+    .order("created_at", { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createProjectChecklistTask({ section, title }) {
+  if (!supabase) throw new Error("Supabase nu este configurat.");
+
+  const { data, error } = await supabase
+    .from("project_checklist_tasks")
+    .insert({ section, title, done: false })
+    .select("id, section, title, done, created_at")
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function updateProjectChecklistTask(id, values) {
+  if (!supabase) throw new Error("Supabase nu este configurat.");
+
+  const { data, error } = await supabase
+    .from("project_checklist_tasks")
+    .update({ ...values, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select("id, section, title, done, created_at")
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteProjectChecklistTask(id) {
+  if (!supabase) throw new Error("Supabase nu este configurat.");
+  const { error } = await supabase.from("project_checklist_tasks").delete().eq("id", id);
+  if (error) throw error;
+}
+
 export async function loadCrmConfig() {
   const data = await loadAdminData();
   return {

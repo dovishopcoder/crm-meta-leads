@@ -2,7 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AppNav } from "../components";
-import { getCurrentSession, loadCurrentManager } from "../supabase-crm";
+import {
+  createProjectChecklistTask,
+  deleteProjectChecklistTask,
+  getCurrentSession,
+  loadCurrentManager,
+  loadProjectChecklistTasks,
+  updateProjectChecklistTask
+} from "../supabase-crm";
 
 const checklistGroups = [
   {
@@ -57,6 +64,11 @@ const checklistGroups = [
 export default function ChecklistPage() {
   const [currentManager, setCurrentManager] = useState(null);
   const [loaded, setLoaded] = useState(false);
+  const [customTasks, setCustomTasks] = useState([]);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskSection, setNewTaskSection] = useState(checklistGroups[0].title);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -74,6 +86,12 @@ export default function ChecklistPage() {
         }
 
         setCurrentManager(manager);
+        try {
+          const tasks = await loadProjectChecklistTasks();
+          setCustomTasks(tasks);
+        } catch (taskError) {
+          setError("Checklist-ul editabil are nevoie de tabelul project_checklist_tasks in Supabase.");
+        }
       } finally {
         setLoaded(true);
       }
@@ -82,11 +100,59 @@ export default function ChecklistPage() {
     load();
   }, []);
 
+  const groups = useMemo(() => checklistGroups.map((group) => ({
+    ...group,
+    items: [
+      ...group.items.map((item) => ({ ...item, source: "system" })),
+      ...customTasks
+        .filter((task) => task.section === group.title)
+        .map((task) => ({ id: task.id, done: task.done, label: task.title, source: "custom" }))
+    ]
+  })), [customTasks]);
+
   const totals = useMemo(() => {
-    const items = checklistGroups.flatMap((group) => group.items);
+    const items = groups.flatMap((group) => group.items);
     const done = items.filter((item) => item.done).length;
     return { done, total: items.length, percent: Math.round((done / items.length) * 100) };
-  }, []);
+  }, [groups]);
+
+  async function handleAddTask(event) {
+    event.preventDefault();
+    const title = newTaskTitle.trim();
+    if (!title) return;
+
+    setSaving(true);
+    setError("");
+    try {
+      const task = await createProjectChecklistTask({ section: newTaskSection, title });
+      setCustomTasks((tasks) => [...tasks, task]);
+      setNewTaskTitle("");
+    } catch (addError) {
+      setError(addError.message || "Nu s-a putut adauga taskul.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleToggleTask(task) {
+    setError("");
+    try {
+      const updated = await updateProjectChecklistTask(task.id, { done: !task.done });
+      setCustomTasks((tasks) => tasks.map((item) => item.id === updated.id ? updated : item));
+    } catch (toggleError) {
+      setError(toggleError.message || "Nu s-a putut actualiza taskul.");
+    }
+  }
+
+  async function handleDeleteTask(taskId) {
+    setError("");
+    try {
+      await deleteProjectChecklistTask(taskId);
+      setCustomTasks((tasks) => tasks.filter((task) => task.id !== taskId));
+    } catch (deleteError) {
+      setError(deleteError.message || "Nu s-a putut sterge taskul.");
+    }
+  }
 
   if (!loaded) return null;
 
@@ -105,15 +171,43 @@ export default function ChecklistPage() {
         </div>
       </section>
 
+      <section className="admin-card checklist-add-card">
+        <form className="checklist-form" onSubmit={handleAddTask}>
+          <select value={newTaskSection} onChange={(event) => setNewTaskSection(event.target.value)}>
+            {checklistGroups.map((group) => <option key={group.title} value={group.title}>{group.title}</option>)}
+          </select>
+          <input
+            value={newTaskTitle}
+            onChange={(event) => setNewTaskTitle(event.target.value)}
+            placeholder="Scrie un task nou..."
+          />
+          <button type="submit" disabled={saving || !newTaskTitle.trim()}>{saving ? "Se salveaza..." : "Adauga task"}</button>
+        </form>
+        {error && <p className="checklist-error">{error}</p>}
+      </section>
+
       <div className="checklist-grid">
-        {checklistGroups.map((group) => (
+        {groups.map((group) => (
           <section key={group.title} className="admin-card checklist-card">
             <h3>{group.title}</h3>
             <div className="checklist-items">
               {group.items.map((item) => (
-                <article key={item.label} className={`checklist-item ${item.done ? "done" : ""}`}>
-                  <span className="checkmark">{item.done ? "OK" : ""}</span>
+                <article key={`${item.source}-${item.id || item.label}`} className={`checklist-item ${item.done ? "done" : ""}`}>
+                  <button
+                    type="button"
+                    className="checkmark"
+                    disabled={item.source !== "custom"}
+                    onClick={() => handleToggleTask(item)}
+                    aria-label={item.done ? "Marcheaza taskul ca nefacut" : "Marcheaza taskul ca facut"}
+                  >
+                    {item.done ? "OK" : ""}
+                  </button>
                   <p>{item.label}</p>
+                  {item.source === "custom" && (
+                    <button type="button" className="ghost-btn checklist-delete" onClick={() => handleDeleteTask(item.id)}>
+                      Sterge
+                    </button>
+                  )}
                 </article>
               ))}
             </div>
