@@ -604,6 +604,17 @@ label textarea {
   font-weight: 750;
 }
 
+.modal-info {
+  margin: 0;
+  padding: 11px 12px;
+  border: 1px solid #b8dfd2;
+  border-radius: 8px;
+  background: var(--green-soft);
+  color: var(--green);
+  font-size: 14px;
+  font-weight: 750;
+}
+
 .ghost-btn,
 .danger-btn,
 .primary-btn {

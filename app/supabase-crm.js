@@ -28,28 +28,6 @@ export async function signOut() {
   if (error) throw error;
 }
 
-export async function sendMetaMessage({ leadId, text }) {
-  if (!supabase) throw new Error("Supabase nu este configurat.");
-
-  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-  if (sessionError) throw sessionError;
-  const accessToken = sessionData.session?.access_token;
-  if (!accessToken) throw new Error("Sesiunea lipseste.");
-
-  const response = await fetch("/api/meta/send-message", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`
-    },
-    body: JSON.stringify({ leadId, text })
-  });
-
-  const payload = await response.json();
-  if (!response.ok) throw new Error(payload.error || "Mesajul nu a putut fi trimis.");
-  return payload;
-}
-
 export async function loadCurrentManager() {
   const session = await getCurrentSession();
   if (!session?.user?.email) return null;
