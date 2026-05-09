@@ -7,12 +7,14 @@ export function AppNav({ active, manager }) {
     window.location.href = "/login";
   }
 
+  const userLabel = manager?.role === "admin" ? "Admin" : `${manager?.name} - Manager`;
+
   return (
     <nav className="app-nav" aria-label="Navigare aplicatie">
       <Link className={active === "crm" ? "active" : ""} href="/">CRM</Link>
       <Link className={active === "stats" ? "active" : ""} href="/stats">Statistici</Link>
       {manager?.role === "admin" && <Link className={active === "admin" ? "active" : ""} href="/admin">Admin</Link>}
-      {manager && <span className="nav-user">{manager.name} · {manager.role === "admin" ? "Admin" : "Manager"}</span>}
+      {manager && <span className="nav-user">{userLabel}</span>}
       {manager && <button type="button" onClick={handleLogout}>Logout</button>}
     </nav>
   );
