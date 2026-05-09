@@ -35,6 +35,7 @@ create table leads (
   name text not null,
   avatar_url text,
   meta_url text,
+  meta_url_verified boolean not null default false,
   email text,
   meta_email text,
   customer_email text,

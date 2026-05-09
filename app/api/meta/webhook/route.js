@@ -264,7 +264,7 @@ async function upsertLeadFromMessage(supabase, message) {
   const now = new Date().toISOString();
   const { data: existing, error: existingError } = await supabase
     .from("leads")
-    .select("id, name, platform, meta_email, meta_url")
+    .select("id, name, platform, meta_email, meta_url, meta_url_verified")
     .eq("meta_contact_id", message.metaContactId)
     .maybeSingle();
 
@@ -276,7 +276,7 @@ async function upsertLeadFromMessage(supabase, message) {
       .update({
         name: message.name,
         avatar_url: message.avatarUrl,
-        meta_url: chooseMetaUrl(existing.meta_url, message.metaUrl, message.metaContactId),
+        meta_url: chooseMetaUrl(existing.meta_url, existing.meta_url_verified, message.metaUrl, message.metaContactId),
         meta_email: message.email || existing.meta_email || null,
         unread: true,
         last_message_at: message.messageAt || now,
@@ -304,6 +304,7 @@ async function upsertLeadFromMessage(supabase, message) {
       name: message.name,
       avatar_url: message.avatarUrl,
       meta_url: message.metaUrl,
+      meta_url_verified: false,
       meta_email: message.email || null,
       status: "new",
       priority: "normal",
@@ -326,7 +327,8 @@ async function upsertLeadFromMessage(supabase, message) {
   return data;
 }
 
-function chooseMetaUrl(existingUrl, generatedUrl, contactId) {
+function chooseMetaUrl(existingUrl, existingVerified, generatedUrl, contactId) {
+  if (existingVerified && existingUrl) return existingUrl;
   if (!existingUrl) return generatedUrl;
 
   try {

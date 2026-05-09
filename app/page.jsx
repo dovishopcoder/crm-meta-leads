@@ -291,6 +291,7 @@ export default function HomePage() {
       stage: lead.stage || "new",
       tags: (lead.tags || []).join(", "),
       metaUrl: lead.metaUrl || "",
+      metaUrlVerified: Boolean(lead.metaUrlVerified),
       customerEmail: lead.customerEmail || "",
       phone: lead.phone || "",
       notes: lead.notes || "",
@@ -300,6 +301,10 @@ export default function HomePage() {
 
   function closeModal() {
     if (!selectedLead || !draft) return;
+    if (modalSource === "inbox" && selectedLead.unread && !selectedLead.metaUrlVerified) {
+      setWarning("Salveaza linkul direct din Meta inainte de a inchide acest lead.");
+      return;
+    }
     if (!canCloseSelected()) return;
     if (modalSource === "inbox" && selectedLead.unread) {
       saveSelectedLead();
@@ -312,14 +317,15 @@ export default function HomePage() {
   function canCloseSelected() {
     if (!selectedLead || !draft) return true;
     if (modalSource !== "inbox" || !selectedLead.unread) return true;
+    if (!selectedLead.metaUrlVerified && !draft.metaUrlVerified) return true;
     if (isTodayOrFutureDateKey(draft.followDate)) return true;
     setWarning("Alege o data de follow-up pentru azi sau viitor, apoi apasa Salveaza. Un mesaj deschis din necitite nu poate fi inchis fara urmatorul pas.");
     return false;
   }
 
-  function saveSelectedLead() {
+  function saveSelectedLead(options = {}) {
     if (!selectedLead || !draft) return;
-    if (!canCloseSelected()) return;
+    if (!options.metaLinkOnly && !canCloseSelected()) return;
 
     const now = toIso(new Date());
     updateLead(selectedLead.id, (lead) => {
@@ -330,6 +336,13 @@ export default function HomePage() {
         return existing || { id: productId, status: "proposed", proposedAt: now, managerId: draft.managerId };
       });
 
+      lead.metaUrl = draft.metaUrl.trim() || lead.metaUrl;
+      lead.metaUrlVerified = Boolean(draft.metaUrlVerified || draft.metaUrl.trim());
+
+      if (options.metaLinkOnly) {
+        return lead;
+      }
+
       lead.status = draft.followDate ? "scheduled" : draft.status;
       lead.unread = false;
       lead.managerId = draft.managerId;
@@ -338,9 +351,6 @@ export default function HomePage() {
       lead.stage = draft.stage;
       lead.tags = draft.tags.split(",").map((tag) => tag.trim()).filter(Boolean);
       lead.products = selectedProducts;
-      if (currentManager?.role === "admin") {
-        lead.metaUrl = draft.metaUrl.trim() || lead.metaUrl;
-      }
       lead.customerEmail = draft.customerEmail.trim();
       lead.phone = draft.phone.trim();
       lead.notes = draft.notes.trim();
@@ -365,8 +375,10 @@ export default function HomePage() {
       return lead;
     });
 
-    setSelectedId(null);
-    setDraft(null);
+    if (!options.keepOpen) {
+      setSelectedId(null);
+      setDraft(null);
+    }
   }
 
   function scheduleLead(id, dateKey) {
@@ -629,6 +641,7 @@ export default function HomePage() {
           lead={selectedLead}
           draft={draft}
           requiresFollowUp={modalSource === "inbox" && selectedLead.unread}
+          requiresMetaLink={modalSource === "inbox" && selectedLead.unread && !selectedLead.metaUrlVerified}
           warning={warning}
           config={{ managers: activeManagers, stages: activeStages, products: activeProducts }}
           isAdmin={currentManager?.role === "admin"}
@@ -703,7 +716,7 @@ function EventCard({ lead, lookups, canMarkIncoming, onOpen, onIncoming, onDragS
   );
 }
 
-function ClientModal({ lead, draft, requiresFollowUp, warning, config, isAdmin, lookups, onChange, onClose, onArchive, onSchedule, onSave }) {
+function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning, config, isAdmin, lookups, onChange, onClose, onArchive, onSchedule, onSave }) {
   function update(field, value) {
     onChange({ ...draft, [field]: value });
   }
@@ -713,6 +726,11 @@ function ClientModal({ lead, draft, requiresFollowUp, warning, config, isAdmin, 
     if (selected.has(productId)) selected.delete(productId);
     else selected.add(productId);
     update("products", Array.from(selected));
+  }
+
+  function saveMetaLinkOnly() {
+    if (!draft.metaUrl.trim()) return;
+    onSave({ metaLinkOnly: true, keepOpen: true });
   }
 
   return (
@@ -734,6 +752,20 @@ function ClientModal({ lead, draft, requiresFollowUp, warning, config, isAdmin, 
               Mesaj deschis din necitite. Alege follow-up pentru azi sau viitor inainte de inchidere.
             </div>
           )}
+
+          {requiresMetaLink ? (
+            <div className="modal-section link-first-panel">
+              <p className="eyebrow">Primul pas</p>
+              <h3>Seteaza linkul direct din Meta</h3>
+              <label>Link Meta direct<input value={draft.metaUrl} onChange={(event) => update("metaUrl", event.target.value)} placeholder="Lipeste linkul copiat din Meta Business Suite" /></label>
+              <div className="modal-actions">
+                <button type="button" className="ghost-btn" onClick={onClose}>Inchide</button>
+                <button type="button" className="primary-btn" onClick={saveMetaLinkOnly} disabled={!draft.metaUrl.trim()}>Salveaza linkul</button>
+              </div>
+              {warning && <p className="modal-warning">{warning}</p>}
+            </div>
+          ) : (
+            <>
 
           <div className="field-grid">
             <label>Status<select value={draft.status} onChange={(event) => update("status", event.target.value)}>{["new", "scheduled", "contacted", "closed"].map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}</select></label>
@@ -772,9 +804,7 @@ function ClientModal({ lead, draft, requiresFollowUp, warning, config, isAdmin, 
             <label>Email client<input value={draft.customerEmail} onChange={(event) => update("customerEmail", event.target.value)} placeholder="email oferit de client" /></label>
             <label>Telefon / contact extra<input value={draft.phone} onChange={(event) => update("phone", event.target.value)} placeholder="+373..." /></label>
           </div>
-          {isAdmin && (
-            <label>Link Meta direct (admin)<input value={draft.metaUrl} onChange={(event) => update("metaUrl", event.target.value)} placeholder="https://business.facebook.com/latest/inbox/all?..." /></label>
-          )}
+          <label>Link Meta direct<input value={draft.metaUrl} onChange={(event) => update("metaUrl", event.target.value)} placeholder="https://business.facebook.com/latest/inbox/all?..." /></label>
           <label>Comentarii<textarea value={draft.notes} onChange={(event) => update("notes", event.target.value)} rows={5} placeholder="Note interne despre client" /></label>
           {warning && <p className="modal-warning">{warning}</p>}
 
@@ -783,6 +813,8 @@ function ClientModal({ lead, draft, requiresFollowUp, warning, config, isAdmin, 
             <button type="button" className="ghost-btn" onClick={onSchedule}>Programeaza</button>
             <button type="submit" className="primary-btn">Salveaza</button>
           </div>
+            </>
+          )}
         </form>
       </section>
     </div>
