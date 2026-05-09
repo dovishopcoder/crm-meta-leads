@@ -340,9 +340,6 @@ export default function HomePage() {
       lead.metaUrlVerified = Boolean(draft.metaUrlVerified || draft.metaUrl.trim());
 
       if (options.metaLinkOnly) {
-        if (!lead.managerId || lead.managerId === "unassigned") {
-          lead.managerId = currentManager?.code || lead.managerId || "unassigned";
-        }
         return lead;
       }
 
