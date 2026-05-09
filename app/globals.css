@@ -83,7 +83,8 @@
   height: 16px;
 }
 
-.stats-page-shell {
+.stats-page-shell,
+.checklist-page-shell {
   min-height: 100vh;
   padding: 22px;
   background: var(--bg);
@@ -117,6 +118,80 @@
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fff;
+}
+
+.checklist-progress {
+  display: grid;
+  gap: 4px;
+  text-align: right;
+}
+
+.checklist-progress strong {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.checklist-progress span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.checklist-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.checklist-card h3 {
+  font-size: 18px;
+}
+
+.checklist-items {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.checklist-item {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.checklist-item p {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.checkmark {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.checklist-item.done .checkmark {
+  border-color: #b8dfd2;
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.checklist-item.done p {
+  color: #516074;
 }
 
 .admin-card .stats-table-card {
@@ -404,9 +479,14 @@
 }
 
 @media (max-width: 900px) {
+  .checklist-grid,
   .stats-cards,
   .stats-layout {
     grid-template-columns: 1fr;
+  }
+
+  .checklist-progress {
+    text-align: left;
   }
 }
 

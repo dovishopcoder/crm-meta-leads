@@ -13,6 +13,7 @@ export function AppNav({ active, manager }) {
     <nav className="app-nav" aria-label="Navigare aplicatie">
       <Link className={active === "crm" ? "active" : ""} href="/">CRM</Link>
       <Link className={active === "stats" ? "active" : ""} href="/stats">Statistici</Link>
+      {manager?.role === "admin" && <Link className={active === "checklist" ? "active" : ""} href="/checklist">Checklist</Link>}
       {manager?.role === "admin" && <Link className={active === "admin" ? "active" : ""} href="/admin">Setari</Link>}
       {manager && <span className="nav-user">{userLabel}</span>}
       {manager && <button type="button" onClick={handleLogout}>Logout</button>}
