@@ -685,7 +685,6 @@ function LeadCard({ lead, lookups, onOpen, onDragStart }) {
         {Boolean(lead.tags?.length) && <div className="tag-row">{lead.tags.map((tag) => <span key={tag} className="tag-pill">{tag}</span>)}</div>}
         <div className="lead-actions">
           <button className="mini-btn primary" onClick={onOpen}>Detalii</button>
-          <a className="mini-btn" href={lead.metaUrl} target="_blank" rel="noreferrer">Meta</a>
         </div>
       </div>
     </article>
@@ -709,7 +708,6 @@ function EventCard({ lead, lookups, canMarkIncoming, onOpen, onIncoming, onDragS
       </div>
       <div className="event-actions">
         <button className="mini-btn primary" onClick={onOpen}>Detalii</button>
-        <a className="mini-btn" href={lead.metaUrl} target="_blank" rel="noreferrer">Meta</a>
         {canMarkIncoming && <button className="mini-btn" onClick={onIncoming}>Mesaj nou</button>}
       </div>
     </article>
