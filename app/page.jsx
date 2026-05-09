@@ -219,7 +219,7 @@ export default function HomePage() {
     return leads.filter((lead) => {
       if (lead.archived || !lead.unread) return false;
       if (activeFilter !== "all" && lead.platform !== activeFilter) return false;
-      if (onlyMyLeads && lead.managerId !== currentManagerCode) return false;
+      if (onlyMyLeads && lead.managerId !== currentManagerCode && lead.managerId !== "unassigned") return false;
       if (managerFilter !== "all" && lead.managerId !== managerFilter) return false;
       const haystack = [lead.name, lead.platform, lead.status, lead.phone, lead.notes, managerForConfig(lead.managerId).name, ...(lead.tags || [])]
         .join(" ")
@@ -340,6 +340,9 @@ export default function HomePage() {
       lead.metaUrlVerified = Boolean(draft.metaUrlVerified || draft.metaUrl.trim());
 
       if (options.metaLinkOnly) {
+        if (!lead.managerId || lead.managerId === "unassigned") {
+          lead.managerId = currentManager?.code || lead.managerId || "unassigned";
+        }
         return lead;
       }
 
