@@ -290,7 +290,7 @@ export default function HomePage() {
       followDate: lead.followDate || "",
       stage: lead.stage || "new",
       tags: (lead.tags || []).join(", "),
-      metaUrl: lead.metaUrl || "",
+      metaUrl: lead.metaUrlVerified ? lead.metaUrl || "" : "",
       metaUrlVerified: Boolean(lead.metaUrlVerified),
       customerEmail: lead.customerEmail || "",
       phone: lead.phone || "",
@@ -665,7 +665,7 @@ function LeadCard({ lead, lookups, onOpen, onDragStart }) {
   const { managerForConfig, stageForConfig, productForConfig } = lookups;
   return (
     <article className="lead-card" draggable onDragStart={onDragStart} onDoubleClick={onOpen}>
-      <img className="avatar" src={lead.avatar} alt="" />
+      <Avatar lead={lead} className="avatar" />
       <div className="lead-main">
         <div className="lead-name-row">
           <span className="lead-name">{lead.name}</span>
@@ -716,6 +716,17 @@ function EventCard({ lead, lookups, canMarkIncoming, onOpen, onIncoming, onDragS
   );
 }
 
+function Avatar({ lead, className = "" }) {
+  const initials = getInitials(lead.name);
+  const [failed, setFailed] = useState(false);
+
+  if (!lead.avatar || failed) {
+    return <span className={`avatar avatar-fallback ${className}`.trim()}>{initials}</span>;
+  }
+
+  return <img className={className || "avatar"} src={lead.avatar} alt="" onError={() => setFailed(true)} />;
+}
+
 function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning, config, isAdmin, lookups, onChange, onClose, onArchive, onSchedule, onSave }) {
   function update(field, value) {
     onChange({ ...draft, [field]: value });
@@ -739,7 +750,7 @@ function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning,
         <form className="client-modal" onSubmit={(event) => { event.preventDefault(); onSave(); }}>
           <button type="button" className="close-btn" onClick={onClose} aria-label="Inchide">x</button>
           <div className="modal-top">
-            <img src={lead.avatar} alt="" />
+            <Avatar lead={lead} />
             <div>
               <p className="eyebrow">{platformLabel(lead.platform)}</p>
               <h3>{lead.name}</h3>
@@ -950,7 +961,7 @@ function ArchivePanel({ leads, lookups, onRestore }) {
           <tbody>
             {leads.map((lead) => (
               <tr key={lead.id}>
-                <td><div className="archive-client"><img src={lead.avatar} alt="" /><span>{lead.name}</span></div></td>
+                <td><div className="archive-client"><Avatar lead={lead} /><span>{lead.name}</span></div></td>
                 <td><span className={`platform-pill platform-${lead.platform}`}>{platformLabel(lead.platform)}</span></td>
                 <td>{managerForConfig(lead.managerId).name}</td>
                 <td><div className="tag-row"><span className="tag-pill">{stageForConfig(lead.stage).name}</span>{lead.tags?.map((tag) => <span key={tag} className="tag-pill">{tag}</span>)}</div></td>
@@ -1040,6 +1051,15 @@ function calendarTitle(dates, view) {
 
 function platformLabel(platform) {
   return platform === "facebook" ? "Facebook" : "Instagram";
+}
+
+function getInitials(name) {
+  return String(name || "Client")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "C";
 }
 
 function statusLabel(status) {

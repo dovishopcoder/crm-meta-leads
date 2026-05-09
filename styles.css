@@ -215,6 +215,20 @@ label textarea {
   background: var(--blue-soft);
 }
 
+.avatar-fallback {
+  display: grid;
+  place-items: center;
+  color: var(--blue);
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.modal-top .avatar-fallback {
+  width: 64px;
+  height: 64px;
+  font-size: 18px;
+}
+
 .lead-main {
   min-width: 0;
 }
