@@ -392,107 +392,6 @@ export default function HomePage() {
     }));
   }
 
-  function markIncomingMessage(id) {
-    updateLead(id, (lead) => ({
-      ...lead,
-      unread: true,
-      activity: [...(lead.activity || []), { type: "incoming_message", at: toIso(new Date()), managerId: lead.managerId }]
-    }));
-  }
-
-  async function addDemoIncomingMessages() {
-    const now = toIso(new Date());
-    const existingNames = new Set(["Irina Ceban", "Elena Balan"]);
-    const newLeads = [
-      {
-        id: `demo-sofia-${Date.now()}`,
-        metaContactId: `demo-sofia-${Date.now()}`,
-        name: "Sofia Popa",
-        platform: "instagram",
-        avatar: "https://i.pravatar.cc/120?img=25",
-        metaUrl: "https://business.facebook.com/latest/inbox/all?asset_id=demo-sofia",
-        email: "",
-        customerEmail: "",
-        status: "new",
-        unread: true,
-        archived: false,
-        stage: "new",
-        createdAt: now,
-        firstMessageAt: now,
-        lastMessageAt: now,
-        processedCount: 0,
-        lastProcessedAt: "",
-        tagHistory: [],
-        products: [],
-        activity: [{ type: "incoming_message", at: now, managerId: currentManager?.code || "unassigned" }],
-        managerId: currentManager?.code || "unassigned",
-        priority: "normal",
-        tags: ["nou"],
-        phone: "",
-        notes: "Mesaj demo primit din Instagram.",
-        followDate: ""
-      },
-      {
-        id: `demo-andrei-${Date.now()}`,
-        metaContactId: `demo-andrei-${Date.now()}`,
-        name: "Andrei Ciobanu",
-        platform: "facebook",
-        avatar: "https://i.pravatar.cc/120?img=60",
-        metaUrl: "https://business.facebook.com/latest/inbox/all?asset_id=demo-andrei",
-        email: "",
-        customerEmail: "",
-        status: "new",
-        unread: true,
-        archived: false,
-        stage: "interested",
-        createdAt: now,
-        firstMessageAt: now,
-        lastMessageAt: now,
-        processedCount: 0,
-        lastProcessedAt: "",
-        tagHistory: [],
-        products: [],
-        activity: [{ type: "incoming_message", at: now, managerId: "unassigned" }],
-        managerId: "unassigned",
-        priority: "high",
-        tags: ["demo"],
-        phone: "",
-        notes: "Mesaj demo primit din Facebook.",
-        followDate: ""
-      }
-    ];
-
-    setSaveState("saving");
-
-    try {
-      const updatedExisting = leads.map((lead) => existingNames.has(lead.name)
-        ? {
-          ...lead,
-          unread: true,
-          lastMessageAt: now,
-          activity: [...(lead.activity || []), { type: "incoming_message", at: now, managerId: lead.managerId }]
-        }
-        : lead);
-
-      const savedExisting = await Promise.all(updatedExisting.filter((lead) => existingNames.has(lead.name)).map((lead) => saveSupabaseLead({ ...lead, tags: [], products: [] })));
-      const savedNew = await Promise.all(newLeads.map(saveSupabaseLead));
-      const savedById = new Map(savedExisting.map((lead) => [lead.id, lead]));
-
-      setLeads([
-        ...updatedExisting.map((lead) => savedById.get(lead.id) || lead),
-        ...savedNew
-      ]);
-      setSaveError("");
-      setSaveState("saved");
-      window.setTimeout(() => setSaveState("idle"), 1400);
-    } catch (error) {
-      console.warn("Demo messages failed:", error.message);
-      setSaveError(error.message);
-      setSaveState("error");
-      window.setTimeout(() => setSaveState("idle"), 2400);
-    }
-  }
-
   function archiveSelectedLead() {
     if (!selectedLead) return;
     updateLead(selectedLead.id, (lead) => ({
@@ -583,7 +482,6 @@ export default function HomePage() {
           <div className="toolbar-actions">
             <button className="icon-btn" onClick={() => setCursorDate(addDays(cursorDate, view === "day" ? -1 : view === "week" ? -7 : -30))} aria-label="Perioada precedenta">&lt;</button>
             <button className="today-btn" onClick={() => setCursorDate(startOfDay(new Date()))}>Azi</button>
-            {currentManager?.role === "admin" && <button className="today-btn" onClick={addDemoIncomingMessages}>Mesaje demo</button>}
             <button className="icon-btn" onClick={() => setCursorDate(addDays(cursorDate, view === "day" ? 1 : view === "week" ? 7 : 30))} aria-label="Perioada urmatoare">&gt;</button>
             <div className="segmented" role="tablist" aria-label="Unitate calendar">
               {["day", "week", "month"].map((item) => (
@@ -624,7 +522,7 @@ export default function HomePage() {
                 </header>
                 <div className="day-events">
                   {events.map((lead) => (
-                    <EventCard key={lead.id} lead={lead} lookups={{ managerForConfig, stageForConfig, productForConfig }} canMarkIncoming={currentManager?.role === "admin"} onOpen={() => openLead(lead, "calendar")} onIncoming={() => markIncomingMessage(lead.id)} onDragStart={(event) => event.dataTransfer.setData("text/plain", lead.id)} />
+                    <EventCard key={lead.id} lead={lead} lookups={{ managerForConfig, stageForConfig, productForConfig }} onOpen={() => openLead(lead, "calendar")} onDragStart={(event) => event.dataTransfer.setData("text/plain", lead.id)} />
                   ))}
                   {!events.length && <p className="empty-day">Liber pentru follow-up</p>}
                 </div>
@@ -686,7 +584,7 @@ function LeadCard({ lead, lookups, onOpen, onDragStart }) {
   );
 }
 
-function EventCard({ lead, lookups, canMarkIncoming, onOpen, onIncoming, onDragStart }) {
+function EventCard({ lead, lookups, onOpen, onDragStart }) {
   const { managerForConfig, stageForConfig, productForConfig } = lookups;
   return (
     <article className={`event-card ${lead.platform} ${lead.priority === "high" ? "priority-high" : ""}`} draggable onDragStart={onDragStart}>
@@ -703,7 +601,6 @@ function EventCard({ lead, lookups, canMarkIncoming, onOpen, onIncoming, onDragS
       </div>
       <div className="event-actions">
         <button className="mini-btn primary" onClick={onOpen}>Detalii</button>
-        {canMarkIncoming && <button className="mini-btn" onClick={onIncoming}>Mesaj nou</button>}
       </div>
     </article>
   );
