@@ -43,14 +43,29 @@ button {
 .app-shell {
   display: grid;
   grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
   min-height: 100vh;
+}
+
+.crm-top-menu {
+  grid-column: 1 / -1;
+  padding: 14px 22px 0;
+  background: #fbfcfe;
+}
+
+.crm-top-menu .app-nav {
+  margin-bottom: 14px;
+}
+
+.mobile-crm-tabs {
+  display: none;
 }
 
 .inbox-panel {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  min-height: 100vh;
+  min-height: calc(100vh - 67px);
   padding: 22px;
   background: #fbfcfe;
   border-right: 1px solid var(--line);
@@ -836,6 +851,43 @@ label textarea {
   .app-shell {
     grid-template-columns: 1fr;
     min-height: auto;
+  }
+
+  .crm-top-menu {
+    padding: 12px 14px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .mobile-crm-tabs {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(246, 247, 249, 0.96);
+    backdrop-filter: blur(8px);
+  }
+
+  .mobile-crm-tabs button {
+    min-height: 42px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--text);
+    font-weight: 850;
+  }
+
+  .mobile-crm-tabs button.active {
+    border-color: var(--green);
+    background: var(--green);
+    color: #fff;
+  }
+
+  .mobile-hidden {
+    display: none;
   }
 
   .inbox-panel {

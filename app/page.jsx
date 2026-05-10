@@ -177,6 +177,7 @@ export default function HomePage() {
   const [search, setSearch] = useState("");
   const [view, setView] = useState("week");
   const [cursorDate, setCursorDate] = useState(startOfDay(new Date()));
+  const [mobileView, setMobileView] = useState("inbox");
 
   useEffect(() => {
     async function loadLeads() {
@@ -422,7 +423,20 @@ export default function HomePage() {
 
   return (
     <main className="app-shell">
-      <aside className="inbox-panel">
+      <div className="crm-top-menu">
+        <AppNav active="crm" manager={currentManager} />
+      </div>
+
+      <div className="mobile-crm-tabs" role="tablist" aria-label="Interfete CRM">
+        <button type="button" className={mobileView === "inbox" ? "active" : ""} onClick={() => setMobileView("inbox")}>
+          Necitite
+        </button>
+        <button type="button" className={mobileView === "calendar" ? "active" : ""} onClick={() => setMobileView("calendar")}>
+          Calendar
+        </button>
+      </div>
+
+      <aside className={`inbox-panel ${mobileView !== "inbox" ? "mobile-hidden" : ""}`}>
         <div className="panel-head">
           <div>
             <p className="eyebrow">Meta Inbox</p>
@@ -466,8 +480,7 @@ export default function HomePage() {
         </section>
       </aside>
 
-      <section className="calendar-panel">
-        <AppNav active="crm" manager={currentManager} />
+      <section className={`calendar-panel ${mobileView !== "calendar" ? "mobile-hidden" : ""}`}>
         <div className={`connection-banner ${dataSource === "supabase" ? "online" : "offline"}`}>
           <span>{dataSource === "supabase" ? "Conectat la Supabase" : "Mod local"}</span>
           <span>{saveState === "saving" ? "Se salveaza..." : saveState === "saved" ? "Salvat" : saveState === "error" ? `Eroare: ${saveError || "salvare esuata"}` : "Gata"}</span>
