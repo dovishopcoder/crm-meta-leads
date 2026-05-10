@@ -495,7 +495,7 @@ export default function HomePage() {
 
         <div className="calendar-meta">
           <span>Prima coloana este mereu data selectata.</span>
-          <span>Trage un lead peste o zi sau foloseste butonul Programeaza.</span>
+          <span>Trage un lead peste o zi sau deschide detaliile pentru salvare.</span>
         </div>
 
         <section className="calendar-grid" style={{ "--columns": visibleDates.length }} aria-label="Calendar follow-up">

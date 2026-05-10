@@ -825,8 +825,17 @@ label textarea {
 }
 
 @media (max-width: 900px) {
+  h1 {
+    font-size: 23px;
+  }
+
+  h2 {
+    font-size: 22px;
+  }
+
   .app-shell {
     grid-template-columns: 1fr;
+    min-height: auto;
   }
 
   .inbox-panel {
@@ -836,7 +845,11 @@ label textarea {
   }
 
   .lead-list {
-    max-height: 420px;
+    max-height: 48vh;
+  }
+
+  .calendar-panel {
+    padding-top: 18px;
   }
 
   .calendar-toolbar,
@@ -849,7 +862,12 @@ label textarea {
     justify-content: flex-start;
   }
 
+  .calendar-grid {
+    scroll-snap-type: x proximity;
+  }
+
   .day-column {
+    scroll-snap-align: start;
     min-height: 520px;
   }
 
@@ -860,10 +878,78 @@ label textarea {
 }
 
 @media (max-width: 560px) {
+  body {
+    overflow-x: hidden;
+  }
+
   .inbox-panel,
   .calendar-panel,
   .client-modal {
-    padding: 16px;
+    padding: 14px;
+  }
+
+  .inbox-panel {
+    gap: 12px;
+  }
+
+  .panel-head,
+  .archive-head {
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .count-badge {
+    min-width: 34px;
+    height: 34px;
+  }
+
+  .quick-filters {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .chip,
+  .today-btn,
+  .ghost-btn,
+  .danger-btn,
+  .primary-btn,
+  .mini-btn {
+    min-height: 40px;
+  }
+
+  .lead-list {
+    max-height: 54vh;
+    padding-bottom: 2px;
+  }
+
+  .lead-card {
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .avatar,
+  .modal-top img {
+    width: 42px;
+    height: 42px;
+  }
+
+  .lead-name-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .lead-name {
+    white-space: normal;
+  }
+
+  .lead-details {
+    margin-bottom: 8px;
+  }
+
+  .manager-line {
+    align-items: flex-start;
+    flex-wrap: wrap;
   }
 
   .lead-actions,
@@ -871,8 +957,109 @@ label textarea {
     grid-template-columns: 1fr;
   }
 
+  .calendar-toolbar {
+    gap: 12px;
+  }
+
+  .calendar-title h2 {
+    font-size: 20px;
+    line-height: 1.2;
+  }
+
+  .toolbar-actions {
+    display: grid;
+    grid-template-columns: 42px 1fr 42px;
+    width: 100%;
+  }
+
+  .toolbar-actions .segmented {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .icon-btn,
+  .today-btn {
+    height: 40px;
+  }
+
+  .icon-btn {
+    width: 42px;
+    font-size: 22px;
+  }
+
+  .calendar-meta {
+    margin: 14px 0 10px;
+    gap: 6px;
+  }
+
   .calendar-grid {
-    grid-template-columns: repeat(var(--columns), minmax(230px, 1fr));
+    margin-right: -14px;
+    border-right: 0;
+    border-radius: 8px 0 0 8px;
+    grid-template-columns: repeat(var(--columns), minmax(78vw, 1fr));
+  }
+
+  .day-column {
+    min-height: 430px;
+  }
+
+  .day-head {
+    padding: 10px;
+  }
+
+  .day-events {
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .event-card {
+    padding: 9px;
+  }
+
+  .client-dialog {
+    width: 100%;
+    border-radius: 0;
+  }
+
+  .client-modal {
+    gap: 12px;
+    min-height: 100vh;
+    padding-bottom: 20px;
+  }
+
+  .close-btn {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    z-index: 2;
+  }
+
+  .modal-top {
+    align-items: flex-start;
+    padding-right: 42px;
+  }
+
+  .modal-top img,
+  .modal-top .avatar-empty {
+    width: 54px;
+    height: 54px;
+  }
+
+  .modal-top h3 {
+    font-size: 20px;
+    line-height: 1.2;
+  }
+
+  .modal-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .danger-btn {
+    margin-right: 0;
   }
 
   .stats-cards,
