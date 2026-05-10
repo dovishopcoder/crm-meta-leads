@@ -682,7 +682,7 @@ function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning,
 
           <div className="field-grid">
             <label>Status<select value={draft.status} onChange={(event) => update("status", event.target.value)}>{["new", "scheduled", "contacted", "closed"].map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}</select></label>
-            <label>Manager responsabil<select value={draft.managerId} onChange={(event) => update("managerId", event.target.value)}>{config.managers.map((manager) => <option key={manager.code} value={manager.code}>{manager.name}</option>)}</select></label>
+            <label>Manager responsabil<select value={draft.managerId} onChange={(event) => update("managerId", event.target.value)}><option value="unassigned">Neatribuit</option>{config.managers.map((manager) => <option key={manager.code} value={manager.code}>{manager.name}</option>)}</select></label>
           </div>
 
           <div className="field-grid">
