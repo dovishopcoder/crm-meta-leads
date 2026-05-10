@@ -656,7 +656,7 @@ function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning,
             <div>
               <p className="eyebrow">{platformLabel(lead.platform)}</p>
               <h3>{lead.name}</h3>
-              <a href={lead.metaUrl} target="_blank" rel="noreferrer">Deschide in Meta Business Suite</a>
+              <a className="meta-open-btn" href={lead.metaUrl} target="_blank" rel="noreferrer">Deschide in Meta Business Suite</a>
             </div>
           </div>
 

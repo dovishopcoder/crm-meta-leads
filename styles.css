@@ -588,6 +588,15 @@ label textarea {
   text-decoration: none;
 }
 
+.meta-open-btn {
+  min-height: 38px;
+  padding: 9px 12px;
+  border: 1px solid var(--blue);
+  border-radius: 8px;
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
 .field-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
