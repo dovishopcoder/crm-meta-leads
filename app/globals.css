@@ -59,6 +59,29 @@
   color: var(--text);
 }
 
+.nav-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.nav-brand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  max-width: 220px;
+}
+
+.nav-brand img {
+  display: block;
+  width: auto;
+  height: 36px;
+  max-width: 220px;
+  object-fit: contain;
+}
+
 .app-nav a.active {
   border-color: var(--green);
   background: var(--green-soft);
@@ -545,6 +568,11 @@
     font-size: 13px;
   }
 
+  .nav-brand img {
+    height: 34px;
+    max-width: 190px;
+  }
+
   .admin-hero {
     align-items: flex-start;
     flex-direction: column;
@@ -587,8 +615,21 @@
     text-align: center;
   }
 
-  .nav-user {
+  .nav-right {
     grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-left: 0;
+  }
+
+  .nav-user,
+  .nav-brand {
+    grid-column: 1 / -1;
+  }
+
+  .nav-brand img {
+    height: 32px;
+    max-width: min(220px, 100%);
   }
 
   .stats-page-shell,

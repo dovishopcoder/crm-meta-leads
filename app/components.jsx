@@ -15,8 +15,13 @@ export function AppNav({ active, manager }) {
       <Link className={active === "stats" ? "active" : ""} href="/stats">Statistici</Link>
       {manager?.role === "admin" && <Link className={active === "checklist" ? "active" : ""} href="/checklist">Checklist</Link>}
       {manager?.role === "admin" && <Link className={active === "admin" ? "active" : ""} href="/admin">Setari</Link>}
-      {manager && <span className="nav-user">{userLabel}</span>}
-      {manager && <button type="button" onClick={handleLogout}>Logout</button>}
+      <div className="nav-right">
+        {manager && <span className="nav-user">{userLabel}</span>}
+        {manager && <button type="button" onClick={handleLogout}>Logout</button>}
+        <span className="nav-brand" aria-label="NextTouch CRM">
+          <img src="/nexttouch-logo.png" alt="NextTouch CRM" />
+        </span>
+      </div>
     </nav>
   );
 }
