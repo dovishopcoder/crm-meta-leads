@@ -798,25 +798,6 @@ function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning,
     onChange({ ...draft, [field]: value });
   }
 
-  function toggleProduct(productId) {
-    const selected = new Set(draft.products);
-    if (selected.has(productId)) selected.delete(productId);
-    else selected.add(productId);
-    update("products", Array.from(selected));
-  }
-
-  function toggleReligion(religionName) {
-    const selected = new Set(
-      draft.tags
-        .split(",")
-        .map((tag) => tag.trim())
-        .filter(Boolean)
-    );
-    if (selected.has(religionName)) selected.delete(religionName);
-    else selected.add(religionName);
-    update("tags", Array.from(selected).join(", "));
-  }
-
   function saveMetaLinkOnly() {
     if (!draft.metaUrl.trim()) return;
     onSave({ metaLinkOnly: true, keepOpen: true });
@@ -868,28 +849,9 @@ function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning,
 
           <label>Etapa / tag principal<select value={draft.stage} onChange={(event) => update("stage", event.target.value)}>{config.stages.map((stage) => <option key={stage.id} value={stage.id}>{stage.name}</option>)}</select></label>
 
-          <div className="modal-section">
-            <p className="eyebrow">Religie</p>
-            <div className="product-grid">
-              {config.religions.map((religion) => (
-                <label key={religion.id} className="product-option">
-                  <input type="checkbox" checked={draft.tags.split(",").map((tag) => tag.trim()).includes(religion.name)} onChange={() => toggleReligion(religion.name)} />
-                  <span>{religion.name}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="modal-section">
-            <p className="eyebrow">Produse propuse</p>
-            <div className="product-grid">
-              {config.products.map((product) => (
-                <label key={product.id} className="product-option">
-                  <input type="checkbox" checked={draft.products.includes(product.id)} onChange={() => toggleProduct(product.id)} />
-                  <span>{product.name}</span>
-                </label>
-              ))}
-            </div>
+          <div className="field-grid">
+            <label>Religie<select value={draft.tags} onChange={(event) => update("tags", event.target.value)}><option value="">Neindicat</option>{config.religions.map((religion) => <option key={religion.id} value={religion.name}>{religion.name}</option>)}</select></label>
+            <label>Produs propus<select value={draft.products[0] || ""} onChange={(event) => update("products", event.target.value ? [event.target.value] : [])}><option value="">Niciun produs</option>{config.products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>
           </div>
 
           <div className="client-meta-grid">
