@@ -1,7 +1,12 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 import { signOut } from "./supabase-crm";
 
 export function AppNav({ active, manager }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
   async function handleLogout() {
     await signOut();
     window.location.href = "/login";
@@ -11,13 +16,29 @@ export function AppNav({ active, manager }) {
 
   return (
     <nav className="app-nav" aria-label="Navigare aplicatie">
-      <Link className={active === "crm" ? "active" : ""} href="/">CRM</Link>
-      <Link className={active === "stats" ? "active" : ""} href="/stats">Statistici</Link>
-      {manager?.role === "admin" && <Link className={active === "checklist" ? "active" : ""} href="/checklist">Checklist</Link>}
-      {manager?.role === "admin" && <Link className={active === "admin" ? "active" : ""} href="/admin">Setari</Link>}
+      <button
+        type="button"
+        className="nav-menu-toggle"
+        onClick={() => setMenuOpen((open) => !open)}
+        aria-expanded={menuOpen}
+        aria-label="Deschide meniul"
+      >
+        <span />
+        <span />
+        <span />
+      </button>
+
+      <div className={`nav-links ${menuOpen ? "open" : ""}`}>
+        <Link className={active === "crm" ? "active" : ""} href="/">CRM</Link>
+        <Link className={active === "stats" ? "active" : ""} href="/stats">Statistici</Link>
+        {manager?.role === "admin" && <Link className={active === "checklist" ? "active" : ""} href="/checklist">Checklist</Link>}
+        {manager?.role === "admin" && <Link className={active === "admin" ? "active" : ""} href="/admin">Setari</Link>}
+        {manager && <button className="mobile-logout" type="button" onClick={handleLogout}>Logout</button>}
+      </div>
+
       <div className="nav-right">
         {manager && <span className="nav-user">{userLabel}</span>}
-        {manager && <button type="button" onClick={handleLogout}>Logout</button>}
+        {manager && <button className="desktop-logout" type="button" onClick={handleLogout}>Logout</button>}
         <span className="nav-brand" aria-label="NextTouch CRM">
           <img src="/nexttouch-logo.png" alt="NextTouch CRM" />
         </span>
