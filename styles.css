@@ -321,6 +321,12 @@ label textarea {
   color: var(--green);
 }
 
+.mini-btn.danger {
+  border-color: #f0bbc7;
+  background: var(--rose-soft);
+  color: var(--rose);
+}
+
 .calendar-panel {
   min-width: 0;
   padding: 22px;

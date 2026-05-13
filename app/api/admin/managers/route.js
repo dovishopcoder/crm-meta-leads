@@ -93,6 +93,68 @@ export async function POST(request) {
   }
 }
 
+export async function DELETE(request) {
+  try {
+    const token = getBearerToken(request);
+    if (!token) {
+      return NextResponse.json({ error: "Sesiunea admin lipseste." }, { status: 401 });
+    }
+
+    const supabase = serverSupabase();
+    const authClient = publicSupabase();
+    const { data: userData, error: userError } = await authClient.auth.getUser(token);
+    if (userError || !userData.user?.email) {
+      return NextResponse.json({ error: "Sesiunea admin nu este valida." }, { status: 401 });
+    }
+
+    const { data: adminManager, error: adminError } = await supabase
+      .from("managers")
+      .select("id, role, active")
+      .eq("email", userData.user.email)
+      .maybeSingle();
+
+    if (adminError) throw adminError;
+    if (adminManager?.role !== "admin" || !adminManager.active) {
+      return NextResponse.json({ error: "Doar adminul poate sterge manageri." }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const managerId = searchParams.get("id");
+    if (!managerId) {
+      return NextResponse.json({ error: "Managerul lipseste." }, { status: 400 });
+    }
+
+    if (managerId === adminManager.id) {
+      return NextResponse.json({ error: "Nu poti sterge adminul cu care esti logat." }, { status: 400 });
+    }
+
+    const { data: manager, error: managerLoadError } = await supabase
+      .from("managers")
+      .select("id, auth_user_id")
+      .eq("id", managerId)
+      .maybeSingle();
+
+    if (managerLoadError) throw managerLoadError;
+    if (!manager) {
+      return NextResponse.json({ error: "Managerul nu exista." }, { status: 404 });
+    }
+
+    const { error: deleteManagerError } = await supabase.from("managers").delete().eq("id", managerId);
+    if (deleteManagerError) throw deleteManagerError;
+
+    if (manager.auth_user_id) {
+      const { error: deleteUserError } = await supabase.auth.admin.deleteUser(manager.auth_user_id);
+      if (deleteUserError) {
+        return NextResponse.json({ ok: true, warning: "Managerul a fost sters, dar userul Auth nu a putut fi sters automat." });
+      }
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return NextResponse.json({ error: error.message || "Nu s-a putut sterge managerul." }, { status: 500 });
+  }
+}
+
 function getBearerToken(request) {
   const header = request.headers.get("authorization") || "";
   const match = header.match(/^Bearer\s+(.+)$/i);

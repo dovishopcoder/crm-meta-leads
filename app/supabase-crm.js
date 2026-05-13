@@ -162,6 +162,26 @@ export async function createManager({ name, email, password, role, color }) {
   if (!response.ok) throw new Error(payload.error || "Nu s-a putut adauga managerul.");
 }
 
+export async function deleteManager(id) {
+  if (!supabase) throw new Error("Supabase nu este configurat.");
+
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) throw sessionError;
+  const accessToken = sessionData.session?.access_token;
+  if (!accessToken) throw new Error("Sesiunea admin lipseste.");
+
+  const response = await fetch(`/api/admin/managers?id=${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${accessToken}`
+    }
+  });
+
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.error || "Nu s-a putut sterge managerul.");
+  return payload;
+}
+
 export async function createStage({ code, name, position }) {
   if (!supabase) throw new Error("Supabase nu este configurat.");
   const { error } = await supabase.from("stages").insert({

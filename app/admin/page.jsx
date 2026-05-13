@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AppNav } from "../components";
-import { countActiveLeadsForManager, createManager, createProduct, createStage, getCurrentSession, loadAdminData, loadCurrentManager, transferActiveLeads, updateManager, updateProduct, updateStage } from "../supabase-crm";
+import { countActiveLeadsForManager, createManager, createProduct, createStage, deleteManager, getCurrentSession, loadAdminData, loadCurrentManager, transferActiveLeads, updateManager, updateProduct, updateStage } from "../supabase-crm";
 
 export default function AdminPage() {
   const [currentManager, setCurrentManager] = useState(null);
@@ -137,6 +137,18 @@ export default function AdminPage() {
     setEditForm({});
   }
 
+  async function handleDeleteManager(manager) {
+    if (manager.id === currentManager?.id) {
+      setError("Nu poti sterge adminul cu care esti logat.");
+      return;
+    }
+
+    const confirmed = window.confirm(`Stergi managerul ${manager.name}? Lead-urile lui vor ramane in CRM ca neatribuite.`);
+    if (!confirmed) return;
+
+    await submitAdminAction(() => deleteManager(manager.id), "Managerul a fost sters.");
+  }
+
   if (!loaded) return null;
 
   return (
@@ -202,6 +214,8 @@ export default function AdminPage() {
             onEditForm={setEditForm}
             onSave={saveEdit}
             onCancel={cancelEdit}
+            onDelete={handleDeleteManager}
+            currentManagerId={currentManager?.id}
           />
         </section>
 
@@ -266,7 +280,7 @@ function slugifyInput(value) {
   return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
-function AdminTable({ title, columns, rows, type, editing, editForm, onEdit, onEditForm, onSave, onCancel }) {
+function AdminTable({ title, columns, rows, type, editing, editForm, onEdit, onEditForm, onSave, onCancel, onDelete, currentManagerId }) {
   return (
     <section className="stats-table-card admin-card">
       <h3>{title}</h3>
@@ -291,7 +305,12 @@ function AdminTable({ title, columns, rows, type, editing, editForm, onEdit, onE
                       <button className="mini-btn" type="button" onClick={onCancel}>Renunta</button>
                     </div>
                   ) : (
-                    <button className="mini-btn primary" type="button" onClick={() => onEdit(type, row)}>Editeaza</button>
+                    <div className="table-actions">
+                      <button className="mini-btn primary" type="button" onClick={() => onEdit(type, row)}>Editeaza</button>
+                      {type === "manager" && row.id !== currentManagerId && (
+                        <button className="mini-btn danger" type="button" onClick={() => onDelete(row)}>Sterge</button>
+                      )}
+                    </div>
                   )}
                 </td>
               </tr>
