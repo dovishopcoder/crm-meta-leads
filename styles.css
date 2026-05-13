@@ -27,6 +27,7 @@ body {
   min-height: 100vh;
   background: var(--bg);
   color: var(--text);
+  cursor: default;
 }
 
 button,
@@ -37,6 +38,25 @@ textarea {
 }
 
 button {
+  cursor: pointer;
+}
+
+a,
+select,
+label:has(input[type="checkbox"]),
+label:has(input[type="radio"]) {
+  cursor: pointer;
+}
+
+input,
+textarea {
+  cursor: text;
+}
+
+input[type="checkbox"],
+input[type="radio"],
+input[type="color"],
+input[type="date"] {
   cursor: pointer;
 }
 
