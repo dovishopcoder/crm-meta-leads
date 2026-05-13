@@ -341,6 +341,56 @@ export default function HomePage() {
     }
 
     const now = toIso(new Date());
+    const existingLead = leads.find((lead) => normalizeMetaUrl(lead.metaUrl) === normalizeMetaUrl(metaUrl));
+
+    if (existingLead) {
+      const phone = manualLead.phone.trim();
+      const notes = manualLead.notes.trim();
+      const updatedLead = {
+        ...existingLead,
+        name: name || existingLead.name,
+        platform: manualLead.platform || existingLead.platform,
+        metaUrl,
+        metaUrlVerified: true,
+        hook: manualLead.hook || existingLead.hook || "",
+        unread: true,
+        archived: false,
+        archivedAt: "",
+        status: "new",
+        followDate: "",
+        lastMessageAt: now,
+        phone: phone || existingLead.phone || "",
+        notes: notes ? [existingLead.notes, notes].filter(Boolean).join("\n") : existingLead.notes,
+        managerId: manualLead.managerId === "unassigned" ? existingLead.managerId || "unassigned" : manualLead.managerId,
+        priority: manualLead.priority || existingLead.priority || "normal",
+        activity: [
+          ...(existingLead.activity || []),
+          { type: "manual_duplicate_reopened", at: now, managerId: manualLead.managerId }
+        ]
+      };
+
+      setSaveState("saving");
+      saveSupabaseLead(updatedLead)
+        .then((savedLead) => {
+          setLeads((current) => [savedLead, ...current.filter((lead) => lead.id !== existingLead.id && lead.id !== savedLead.id)]);
+          setSaveError("");
+          setSaveState("saved");
+          setDataSource("supabase");
+          setManualLead(makeEmptyManualLead());
+          setManualLeadOpen(false);
+          setManualError("");
+          setMobileView("inbox");
+          window.setTimeout(() => setSaveState("idle"), 1400);
+        })
+        .catch((error) => {
+          setSaveError(error.message);
+          setSaveState("error");
+          setManualError(error.message || "Nu s-a putut marca lead-ul existent ca necitit.");
+          window.setTimeout(() => setSaveState("idle"), 2400);
+        });
+      return;
+    }
+
     const lead = {
       id: `manual-${Date.now()}`,
       metaContactId: `manual-${Date.now()}`,
@@ -1142,6 +1192,25 @@ function avatarSrc(src) {
     return src;
   }
   return src;
+}
+
+function normalizeMetaUrl(value) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  try {
+    const url = new URL(trimmed);
+    url.hash = "";
+    url.protocol = url.protocol.toLowerCase();
+    url.hostname = url.hostname.toLowerCase();
+    const sortedParams = new URLSearchParams();
+    Array.from(url.searchParams.entries())
+      .sort(([left], [right]) => left.localeCompare(right))
+      .forEach(([key, paramValue]) => sortedParams.append(key, paramValue));
+    url.search = sortedParams.toString();
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return trimmed.replace(/\/$/, "");
+  }
 }
 
 function statusLabel(status) {
