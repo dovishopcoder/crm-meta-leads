@@ -32,25 +32,31 @@ export default function LoginPage() {
 
   return (
     <main className="login-shell">
-      <form className="login-card" onSubmit={handleSubmit}>
-        <div>
-          <p className="eyebrow">CRM Meta Leads</p>
-          <h1>Login manager</h1>
+      <div className="login-stack">
+        <div className="login-logo">
+          <img src="/nexttouch-logo.png" alt="NextTouch CRM" />
         </div>
 
-        <label>
-          Email
-          <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="manager@email.com" required />
-        </label>
+        <form className="login-card" onSubmit={handleSubmit}>
+          <div>
+            <p className="eyebrow">NextTouch CRM</p>
+            <h1>Login manager</h1>
+          </div>
 
-        <label>
-          Parola
-          <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Parola" required />
-        </label>
+          <label>
+            Email
+            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="manager@email.com" required />
+          </label>
 
-        {error && <p className="modal-warning">{error}</p>}
-        <button className="primary-btn" type="submit" disabled={loading}>{loading ? "Se conecteaza..." : "Intra in CRM"}</button>
-      </form>
+          <label>
+            Parola
+            <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Parola" required />
+          </label>
+
+          {error && <p className="modal-warning">{error}</p>}
+          <button className="primary-btn" type="submit" disabled={loading}>{loading ? "Se conecteaza..." : "Intra in CRM"}</button>
+        </form>
+      </div>
     </main>
   );
 }

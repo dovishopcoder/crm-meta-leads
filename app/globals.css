@@ -391,10 +391,31 @@
   background: var(--bg);
 }
 
+.login-stack {
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+  width: min(460px, calc(100vw - 44px));
+}
+
+.login-logo {
+  display: grid;
+  place-items: center;
+  width: min(360px, 100%);
+}
+
+.login-logo img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 120px;
+  object-fit: contain;
+}
+
 .login-card {
   display: grid;
   gap: 16px;
-  width: min(420px, calc(100vw - 44px));
+  width: 100%;
   min-width: 0;
   padding: 24px;
   border: 1px solid var(--line);
@@ -642,8 +663,20 @@
     padding: 14px;
   }
 
+  .login-stack {
+    width: calc(100vw - 44px);
+    gap: 14px;
+  }
+
+  .login-logo {
+    width: min(300px, 100%);
+  }
+
+  .login-logo img {
+    max-height: 94px;
+  }
+
   .login-card {
-    width: calc(100vw - 56px);
     padding: 20px;
   }
 
