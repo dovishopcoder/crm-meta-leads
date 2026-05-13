@@ -344,50 +344,8 @@ export default function HomePage() {
     const existingLead = leads.find((lead) => normalizeMetaUrl(lead.metaUrl) === normalizeMetaUrl(metaUrl));
 
     if (existingLead) {
-      const phone = manualLead.phone.trim();
-      const notes = manualLead.notes.trim();
-      const updatedLead = {
-        ...existingLead,
-        name: name || existingLead.name,
-        platform: manualLead.platform || existingLead.platform,
-        metaUrl,
-        metaUrlVerified: true,
-        hook: manualLead.hook || existingLead.hook || "",
-        unread: true,
-        archived: false,
-        archivedAt: "",
-        status: "new",
-        followDate: existingLead.followDate || "",
-        lastMessageAt: now,
-        phone: phone || existingLead.phone || "",
-        notes: notes ? [existingLead.notes, notes].filter(Boolean).join("\n") : existingLead.notes,
-        managerId: manualLead.managerId === "unassigned" ? existingLead.managerId || "unassigned" : manualLead.managerId,
-        priority: manualLead.priority || existingLead.priority || "normal",
-        activity: [
-          ...(existingLead.activity || []),
-          { type: "manual_duplicate_reopened", at: now, managerId: manualLead.managerId }
-        ]
-      };
-
-      setSaveState("saving");
-      saveSupabaseLead(updatedLead)
-        .then((savedLead) => {
-          setLeads((current) => [savedLead, ...current.filter((lead) => lead.id !== existingLead.id && lead.id !== savedLead.id)]);
-          setSaveError("");
-          setSaveState("saved");
-          setDataSource("supabase");
-          setManualLead(makeEmptyManualLead());
-          setManualLeadOpen(false);
-          setManualError("");
-          setMobileView("inbox");
-          window.setTimeout(() => setSaveState("idle"), 1400);
-        })
-        .catch((error) => {
-          setSaveError(error.message);
-          setSaveState("error");
-          setManualError(error.message || "Nu s-a putut marca lead-ul existent ca necitit.");
-          window.setTimeout(() => setSaveState("idle"), 2400);
-        });
+      const location = existingLead.unread ? "in Necitite" : existingLead.followDate ? "in calendar" : "in CRM";
+      setManualError(`Acest lead exista deja ${location}: ${existingLead.name}. Nu poti crea acelasi lead de doua ori.`);
       return;
     }
 
@@ -423,7 +381,7 @@ export default function HomePage() {
     };
 
     setSaveState("saving");
-    saveSupabaseLead(lead)
+    saveSupabaseLead(lead, { rejectDuplicateMetaUrl: true })
       .then((savedLead) => {
         setLeads((current) => [savedLead, ...current]);
         setSaveError("");

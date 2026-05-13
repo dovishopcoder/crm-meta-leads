@@ -327,7 +327,7 @@ export async function loadSupabaseLeads() {
   return data.map((lead) => fromSupabaseLead(lead, refs));
 }
 
-export async function saveSupabaseLead(lead) {
+export async function saveSupabaseLead(lead, options = {}) {
   if (!supabase) return lead;
 
   const refs = await ensureReferenceData();
@@ -366,6 +366,9 @@ export async function saveSupabaseLead(lead) {
   } else {
     const existingByUrl = await findExistingLeadByMetaUrl(leadRow.meta_url);
     if (existingByUrl?.id) {
+      if (options.rejectDuplicateMetaUrl) {
+        throw new Error("Acest lead exista deja in CRM. Nu poti crea acelasi lead de doua ori.");
+      }
       const { error } = await saveLeadRowWithHookFallback(() => supabase.from("leads").update({
         ...leadRow,
         first_message_at: existingByUrl.first_message_at || leadRow.first_message_at
