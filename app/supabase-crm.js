@@ -45,31 +45,20 @@ export async function loadCurrentManager() {
 export async function loadAdminData() {
   if (!supabase) throw new Error("Supabase nu este configurat.");
 
-  const [managerResult, stageResult, productResult, statusResult, religionResult, audienceResult] = await Promise.all([
-    supabase.from("managers").select("id, name, email, role, color, active, created_at").order("created_at", { ascending: true }),
-    supabase.from("stages").select("id, code, name, position, active, created_at").order("position", { ascending: true }),
-    supabase.from("products").select("id, code, name, active, created_at").order("created_at", { ascending: true }),
-    loadOptionalOptionRows("lead_statuses", leadStatuses),
-    loadOptionalOptionRows("religions", religions),
-    supabase
-      .from("leads")
-      .select("id, name, platform, customer_email, meta_email, meta_contact_id, phone, first_message_at, archived_at, managers(name), stages(code, name), lead_tags(tag), lead_products(products(code, name))")
-      .order("created_at", { ascending: false })
-  ]);
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) throw sessionError;
+  const accessToken = sessionData.session?.access_token;
+  if (!accessToken) throw new Error("Sesiunea admin lipseste.");
 
-  if (managerResult.error) throw managerResult.error;
-  if (stageResult.error) throw stageResult.error;
-  if (productResult.error) throw productResult.error;
-  if (audienceResult.error) throw audienceResult.error;
+  const response = await fetch("/api/admin/settings", {
+    headers: {
+      Authorization: `Bearer ${accessToken}`
+    }
+  });
 
-  return {
-    managers: managerResult.data || [],
-    stages: stageResult.data || [],
-    products: productResult.data || [],
-    statuses: statusResult.data || [],
-    religions: religionResult.data || [],
-    audienceLeads: (audienceResult.data || []).map(toAudienceLead)
-  };
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.error || "Nu s-au putut incarca setarile.");
+  return payload;
 }
 
 export async function loadProjectChecklistTasks() {
