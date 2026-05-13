@@ -185,7 +185,10 @@ export default function AdminPage() {
               <option value="manager">Manager</option>
               <option value="admin">Admin</option>
             </select>
-            <input value={managerForm.color} onChange={(event) => setManagerForm({ ...managerForm, color: event.target.value })} placeholder="#1e8f72" />
+            <label className="color-field">
+              Culoare
+              <input type="color" value={managerForm.color} onChange={(event) => setManagerForm({ ...managerForm, color: event.target.value })} />
+            </label>
             <button className="primary-btn" type="submit">Adauga</button>
           </form>
           <AdminTable

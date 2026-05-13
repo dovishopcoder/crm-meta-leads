@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 function serverSupabase() {
@@ -14,6 +15,16 @@ function serverSupabase() {
   });
 }
 
+function publicSupabase() {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error("Supabase public env is missing.");
+  }
+
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: { persistSession: false }
+  });
+}
+
 export async function POST(request) {
   try {
     const token = getBearerToken(request);
@@ -22,7 +33,8 @@ export async function POST(request) {
     }
 
     const supabase = serverSupabase();
-    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+    const authClient = publicSupabase();
+    const { data: userData, error: userError } = await authClient.auth.getUser(token);
     if (userError || !userData.user?.email) {
       return NextResponse.json({ error: "Sesiunea admin nu este valida." }, { status: 401 });
     }

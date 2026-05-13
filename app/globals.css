@@ -332,6 +332,25 @@
   min-width: 120px;
 }
 
+.color-field {
+  min-height: 42px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.color-field input {
+  width: 100%;
+  min-height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
 .table-actions {
   display: flex;
   gap: 6px;
