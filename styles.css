@@ -89,6 +89,12 @@ button {
   gap: 16px;
 }
 
+.panel-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .eyebrow {
   margin: 0 0 4px;
   color: var(--muted);
@@ -543,6 +549,10 @@ label textarea {
   box-shadow: var(--shadow);
 }
 
+.manual-lead-dialog {
+  width: min(560px, calc(100vw - 28px));
+}
+
 .client-dialog::backdrop {
   background: rgba(15, 23, 42, 0.42);
 }
@@ -957,6 +967,11 @@ label textarea {
   .archive-head {
     align-items: flex-start;
     gap: 10px;
+  }
+
+  .panel-head-actions {
+    align-items: stretch;
+    flex-direction: column-reverse;
   }
 
   .count-badge {

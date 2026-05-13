@@ -171,6 +171,9 @@ export default function HomePage() {
   const [modalSource, setModalSource] = useState("direct");
   const [draft, setDraft] = useState(null);
   const [warning, setWarning] = useState("");
+  const [manualLeadOpen, setManualLeadOpen] = useState(false);
+  const [manualLead, setManualLead] = useState(makeEmptyManualLead());
+  const [manualError, setManualError] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
   const [managerFilter, setManagerFilter] = useState("all");
   const [onlyMyLeads, setOnlyMyLeads] = useState(false);
@@ -278,6 +281,73 @@ export default function HomePage() {
 
       return next;
     });
+  }
+
+  function createManualLead(event) {
+    event.preventDefault();
+    const name = manualLead.name.trim();
+    const metaUrl = manualLead.metaUrl.trim();
+
+    if (!name) {
+      setManualError("Scrie numele clientului.");
+      return;
+    }
+
+    if (!metaUrl) {
+      setManualError("Adauga linkul direct din Meta Business Suite.");
+      return;
+    }
+
+    const now = toIso(new Date());
+    const lead = {
+      id: `manual-${Date.now()}`,
+      metaContactId: `manual-${Date.now()}`,
+      name,
+      platform: manualLead.platform,
+      avatar: "",
+      metaUrl,
+      metaUrlVerified: true,
+      email: "",
+      customerEmail: "",
+      status: "new",
+      unread: true,
+      archived: false,
+      stage: "new",
+      createdAt: now,
+      firstMessageAt: now,
+      lastMessageAt: now,
+      processedCount: 0,
+      lastProcessedAt: "",
+      tagHistory: [],
+      products: [],
+      activity: [{ type: "manual_created", at: now, managerId: manualLead.managerId }],
+      managerId: manualLead.managerId,
+      priority: manualLead.priority,
+      tags: manualLead.tags.split(",").map((tag) => tag.trim()).filter(Boolean),
+      phone: manualLead.phone.trim(),
+      notes: manualLead.notes.trim(),
+      followDate: ""
+    };
+
+    setSaveState("saving");
+    saveSupabaseLead(lead)
+      .then((savedLead) => {
+        setLeads((current) => [savedLead, ...current]);
+        setSaveError("");
+        setSaveState("saved");
+        setDataSource("supabase");
+        setManualLead(makeEmptyManualLead());
+        setManualLeadOpen(false);
+        setManualError("");
+        setMobileView("inbox");
+        window.setTimeout(() => setSaveState("idle"), 1400);
+      })
+      .catch((error) => {
+        setSaveError(error.message);
+        setSaveState("error");
+        setManualError(error.message || "Nu s-a putut crea lead-ul.");
+        window.setTimeout(() => setSaveState("idle"), 2400);
+      });
   }
 
   function openLead(lead, source) {
@@ -442,7 +512,10 @@ export default function HomePage() {
             <p className="eyebrow">Meta Inbox</p>
             <h1>Lead-uri noi</h1>
           </div>
-          <span className="count-badge">{filteredLeads.length}</span>
+          <div className="panel-head-actions">
+            <button type="button" className="mini-btn primary" onClick={() => setManualLeadOpen(true)}>Lead manual</button>
+            <span className="count-badge">{filteredLeads.length}</span>
+          </div>
         </div>
 
         <div className="search-wrap">
@@ -563,6 +636,17 @@ export default function HomePage() {
           onSave={saveSelectedLead}
         />
       )}
+
+      {manualLeadOpen && (
+        <ManualLeadModal
+          draft={manualLead}
+          error={manualError}
+          managers={activeManagers}
+          onChange={setManualLead}
+          onClose={() => { setManualLeadOpen(false); setManualError(""); }}
+          onSubmit={createManualLead}
+        />
+      )}
     </main>
   );
 }
@@ -627,6 +711,51 @@ function Avatar({ lead, className = "" }) {
   }
 
   return <img className={className || "avatar"} src={avatarSrc(lead.avatar)} alt="" onError={() => setFailed(true)} />;
+}
+
+function ManualLeadModal({ draft, error, managers, onChange, onClose, onSubmit }) {
+  function update(field, value) {
+    onChange({ ...draft, [field]: value });
+  }
+
+  return (
+    <div className="dialog-backdrop">
+      <section className="client-dialog manual-lead-dialog">
+        <form className="client-modal" onSubmit={onSubmit}>
+          <button type="button" className="close-btn" onClick={onClose} aria-label="Inchide">x</button>
+          <div>
+            <p className="eyebrow">Incarcare manuala</p>
+            <h3>Lead nou din Meta Business Suite</h3>
+          </div>
+
+          <div className="field-grid">
+            <label>Nume client<input value={draft.name} onChange={(event) => update("name", event.target.value)} placeholder="Numele din Meta" autoFocus /></label>
+            <label>Platforma<select value={draft.platform} onChange={(event) => update("platform", event.target.value)}><option value="facebook">Facebook</option><option value="instagram">Instagram</option></select></label>
+          </div>
+
+          <label>Link Meta direct<input value={draft.metaUrl} onChange={(event) => update("metaUrl", event.target.value)} placeholder="https://business.facebook.com/latest/inbox/all?..." /></label>
+
+          <div className="field-grid">
+            <label>Manager responsabil<select value={draft.managerId} onChange={(event) => update("managerId", event.target.value)}><option value="unassigned">Neatribuit</option>{managers.map((manager) => <option key={manager.code} value={manager.code}>{manager.name}</option>)}</select></label>
+            <label>Prioritate<select value={draft.priority} onChange={(event) => update("priority", event.target.value)}><option value="normal">Normala</option><option value="high">Inalta</option><option value="low">Joasa</option></select></label>
+          </div>
+
+          <div className="field-grid">
+            <label>Telefon<input value={draft.phone} onChange={(event) => update("phone", event.target.value)} placeholder="+373..." /></label>
+            <label>Tags<input value={draft.tags} onChange={(event) => update("tags", event.target.value)} placeholder="ex: cald, pret" /></label>
+          </div>
+
+          <label>Comentarii<textarea value={draft.notes} onChange={(event) => update("notes", event.target.value)} rows={4} placeholder="Note interne despre client" /></label>
+          {error && <p className="modal-warning">{error}</p>}
+
+          <div className="modal-actions">
+            <button type="button" className="ghost-btn" onClick={onClose}>Anuleaza</button>
+            <button type="submit" className="primary-btn">Creeaza lead</button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
 }
 
 function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning, config, isAdmin, lookups, onChange, onClose, onArchive, onSave }) {
@@ -798,6 +927,7 @@ function activityTitle(type) {
   return {
     processed: "Client prelucrat",
     incoming_message: "Mesaj nou primit",
+    manual_created: "Lead creat manual",
     archived: "Client arhivat",
     restored: "Client reactivat"
   }[type] || "Activitate";
@@ -925,6 +1055,19 @@ function normalizeLead(lead) {
     tagHistory: Array.isArray(lead.tagHistory) ? lead.tagHistory : [],
     products: Array.isArray(lead.products) ? lead.products.map((item) => (typeof item === "string" ? { id: item, status: "proposed", proposedAt: now, managerId: lead.managerId || "unassigned" } : item)) : [],
     activity: Array.isArray(lead.activity) ? lead.activity : []
+  };
+}
+
+function makeEmptyManualLead() {
+  return {
+    name: "",
+    platform: "facebook",
+    metaUrl: "",
+    managerId: "unassigned",
+    priority: "normal",
+    phone: "",
+    tags: "",
+    notes: ""
   };
 }
 
