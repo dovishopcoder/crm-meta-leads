@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AppNav, StatsPanel } from "../components";
 import { buildStats, loadStoredLeads, managers, products, stages } from "../crm-data";
-import { getCurrentSession, loadCrmConfig, loadCurrentManager, loadSupabaseLeads, supabase } from "../supabase-crm";
+import { getCurrentSession, loadCrmConfig, loadCurrentManager, loadSupabaseLeads, signOut, supabase } from "../supabase-crm";
 
 export default function StatsPage() {
   const [leads, setLeads] = useState([]);
@@ -24,7 +24,9 @@ export default function StatsPage() {
 
         const manager = await loadCurrentManager();
         if (!manager?.active) {
-          throw new Error("Contul logat nu este manager activ in CRM.");
+          await signOut();
+          window.location.href = "/login";
+          return;
         }
         setCurrentManager(manager);
         setCrmConfig(await loadCrmConfig());

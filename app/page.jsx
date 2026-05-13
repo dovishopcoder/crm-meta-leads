@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AppNav } from "./components";
-import { getCurrentSession, loadCrmConfig, loadCurrentManager, loadSupabaseLeads, saveSupabaseLead, supabase } from "./supabase-crm";
+import { getCurrentSession, loadCrmConfig, loadCurrentManager, loadSupabaseLeads, saveSupabaseLead, signOut, supabase } from "./supabase-crm";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const FALLBACK_MANAGER_ID = "diana";
@@ -194,7 +194,9 @@ export default function HomePage() {
 
         const manager = await loadCurrentManager();
         if (!manager?.active) {
-          throw new Error("Contul logat nu este manager activ in CRM. Fa logout si intra cu emailul corect.");
+          await signOut();
+          window.location.href = "/login";
+          return;
         }
         setCurrentManager(manager);
         setCrmConfig(await loadCrmConfig());
