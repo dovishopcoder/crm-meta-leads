@@ -222,46 +222,19 @@ export async function resetManagerPassword(managerId, password) {
 }
 
 export async function createStage({ code, name, position }) {
-  if (!supabase) throw new Error("Supabase nu este configurat.");
-  const { error } = await supabase.from("stages").insert({
-    code,
-    name,
-    position: Number(position) || 0,
-    active: true
-  });
-  if (error) throw error;
+  await saveAdminSetting("POST", { type: "stage", code, name, position, active: true });
 }
 
 export async function createProduct({ code, name }) {
-  if (!supabase) throw new Error("Supabase nu este configurat.");
-  const { error } = await supabase.from("products").insert({
-    code,
-    name,
-    active: true
-  });
-  if (error) throw error;
+  await saveAdminSetting("POST", { type: "product", code, name, active: true });
 }
 
 export async function createLeadStatus({ code, name, position }) {
-  if (!supabase) throw new Error("Supabase nu este configurat.");
-  const { error } = await supabase.from("lead_statuses").insert({
-    code,
-    name,
-    position: Number(position) || 0,
-    active: true
-  });
-  if (error) throw error;
+  await saveAdminSetting("POST", { type: "status", code, name, position, active: true });
 }
 
 export async function createReligion({ code, name, position }) {
-  if (!supabase) throw new Error("Supabase nu este configurat.");
-  const { error } = await supabase.from("religions").insert({
-    code,
-    name,
-    position: Number(position) || 0,
-    active: true
-  });
-  if (error) throw error;
+  await saveAdminSetting("POST", { type: "religion", code, name, position, active: true });
 }
 
 export async function updateManager(id, { name, email, role, color, active }) {
@@ -294,27 +267,40 @@ export async function transferActiveLeads(fromManagerId, toManagerId) {
 }
 
 export async function updateStage(id, { code, name, position, active }) {
-  if (!supabase) throw new Error("Supabase nu este configurat.");
-  const { error } = await supabase.from("stages").update({ code, name, position: Number(position) || 0, active }).eq("id", id);
-  if (error) throw error;
+  await saveAdminSetting("PATCH", { id, type: "stage", code, name, position, active });
 }
 
 export async function updateProduct(id, { code, name, active }) {
-  if (!supabase) throw new Error("Supabase nu este configurat.");
-  const { error } = await supabase.from("products").update({ code, name, active }).eq("id", id);
-  if (error) throw error;
+  await saveAdminSetting("PATCH", { id, type: "product", code, name, active });
 }
 
 export async function updateLeadStatus(id, { code, name, position, active }) {
-  if (!supabase) throw new Error("Supabase nu este configurat.");
-  const { error } = await supabase.from("lead_statuses").update({ code, name, position: Number(position) || 0, active }).eq("id", id);
-  if (error) throw error;
+  await saveAdminSetting("PATCH", { id, type: "status", code, name, position, active });
 }
 
 export async function updateReligion(id, { code, name, position, active }) {
+  await saveAdminSetting("PATCH", { id, type: "religion", code, name, position, active });
+}
+
+async function saveAdminSetting(method, body) {
   if (!supabase) throw new Error("Supabase nu este configurat.");
-  const { error } = await supabase.from("religions").update({ code, name, position: Number(position) || 0, active }).eq("id", id);
-  if (error) throw error;
+
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) throw sessionError;
+  const accessToken = sessionData.session?.access_token;
+  if (!accessToken) throw new Error("Sesiunea admin lipseste.");
+
+  const response = await fetch("/api/admin/settings", {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`
+    },
+    body: JSON.stringify(body)
+  });
+
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.error || "Nu s-a putut salva setarea.");
 }
 
 export async function loadSupabaseLeads() {
