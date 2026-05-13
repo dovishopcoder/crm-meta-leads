@@ -21,6 +21,7 @@
 * {
   box-sizing: border-box;
   cursor: default;
+  user-select: none;
 }
 
 body {
@@ -51,6 +52,12 @@ label:has(input[type="radio"]) {
 input,
 textarea {
   cursor: text;
+  user-select: text;
+}
+
+input *,
+textarea * {
+  user-select: text;
 }
 
 input[type="checkbox"],
