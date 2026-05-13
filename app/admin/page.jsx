@@ -196,10 +196,10 @@ export default function AdminPage() {
       <div className="admin-grid">
         <section className="admin-card">
           <h3>Adauga manager</h3>
-          <form className="admin-form" onSubmit={handleCreateManager}>
-            <input value={managerForm.name} onChange={(event) => setManagerForm({ ...managerForm, name: event.target.value })} placeholder="Nume" required />
-            <input type="email" value={managerForm.email} onChange={(event) => setManagerForm({ ...managerForm, email: event.target.value })} placeholder="Email" required />
-            <input type="password" value={managerForm.password} onChange={(event) => setManagerForm({ ...managerForm, password: event.target.value })} placeholder="Parola temporara" minLength={6} required />
+          <form className="admin-form" onSubmit={handleCreateManager} autoComplete="off">
+            <input autoComplete="off" value={managerForm.name} onChange={(event) => setManagerForm({ ...managerForm, name: event.target.value })} placeholder="Nume manager" required />
+            <input autoComplete="new-email" type="email" value={managerForm.email} onChange={(event) => setManagerForm({ ...managerForm, email: event.target.value })} placeholder="Email manager" required />
+            <input autoComplete="new-password" type="password" value={managerForm.password} onChange={(event) => setManagerForm({ ...managerForm, password: event.target.value })} placeholder="Parola temporara" minLength={6} required />
             <select value={managerForm.role} onChange={(event) => setManagerForm({ ...managerForm, role: event.target.value })}>
               <option value="manager">Manager</option>
               <option value="admin">Admin</option>

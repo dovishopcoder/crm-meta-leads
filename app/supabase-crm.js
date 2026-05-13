@@ -344,19 +344,6 @@ async function ensureReferenceData() {
     active: true
   })), { onConflict: "code" });
 
-  const { data: existingManagers, error: managerError } = await supabase.from("managers").select("id, name, color, role");
-  if (managerError) throw managerError;
-
-  const existingNames = new Set(existingManagers.map((manager) => manager.name.toLowerCase()));
-  const missingManagers = managers
-    .filter((manager) => manager.id !== "unassigned" && !existingNames.has(manager.name.toLowerCase()))
-    .map((manager) => ({ name: manager.name, color: manager.color, role: "manager", active: true, email: `${manager.id}@example.com` }));
-
-  if (missingManagers.length) {
-    const { error } = await supabase.from("managers").insert(missingManagers);
-    if (error) throw error;
-  }
-
   const [{ data: stageRows }, { data: productRows }, { data: managerRows }] = await Promise.all([
     supabase.from("stages").select("id, code, name"),
     supabase.from("products").select("id, code, name"),
