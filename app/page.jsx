@@ -357,7 +357,7 @@ export default function HomePage() {
         archived: false,
         archivedAt: "",
         status: "new",
-        followDate: "",
+        followDate: existingLead.followDate || "",
         lastMessageAt: now,
         phone: phone || existingLead.phone || "",
         notes: notes ? [existingLead.notes, notes].filter(Boolean).join("\n") : existingLead.notes,
