@@ -71,10 +71,6 @@
   color: var(--text);
 }
 
-.mobile-logout {
-  display: none;
-}
-
 .nav-right {
   display: inline-flex;
   align-items: center;
@@ -692,14 +688,6 @@
     min-width: 0;
     min-height: 42px;
     text-align: center;
-  }
-
-  .mobile-logout {
-    display: inline-flex;
-  }
-
-  .desktop-logout {
-    display: none;
   }
 
   .nav-right {
