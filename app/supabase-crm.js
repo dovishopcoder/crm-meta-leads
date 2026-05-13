@@ -1,7 +1,7 @@
 "use client";
 
 import { createClient } from "@supabase/supabase-js";
-import { hooks, leadStatuses, makeDefaultLeads, managers, products, religions, stages } from "./crm-data.js";
+import { hooks, makeDefaultLeads } from "./crm-data.js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -382,22 +382,6 @@ async function saveLeadRowWithHookFallback(action, leadRow) {
 }
 
 async function ensureReferenceData() {
-  await supabase.from("stages").upsert(stages.map((stage, index) => ({
-    code: stage.id,
-    name: stage.name,
-    position: index + 1,
-    active: true
-  })), { onConflict: "code" });
-
-  await supabase.from("products").upsert(products.map((product) => ({
-    code: product.id,
-    name: product.name,
-    active: true
-  })), { onConflict: "code" });
-
-  await upsertOptionalOptionRows("lead_statuses", leadStatuses);
-  await upsertOptionalOptionRows("religions", religions);
-
   const [{ data: stageRows }, { data: productRows }, { data: managerRows }] = await Promise.all([
     supabase.from("stages").select("id, code, name"),
     supabase.from("products").select("id, code, name"),
@@ -443,17 +427,6 @@ async function loadOptionalOptionRows(table, fallbackRows) {
     };
   }
   return result;
-}
-
-async function upsertOptionalOptionRows(table, rows) {
-  const { error } = await supabase.from(table).upsert(rows.map((row, index) => ({
-    code: row.id,
-    name: row.name,
-    position: index + 1,
-    active: true
-  })), { onConflict: "code" });
-
-  if (error && !isMissingTableError(error)) throw error;
 }
 
 function isMissingTableError(error) {
