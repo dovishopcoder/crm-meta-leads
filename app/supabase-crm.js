@@ -364,14 +364,37 @@ export async function saveSupabaseLead(lead) {
     const { error } = await saveLeadRowWithHookFallback(() => supabase.from("leads").update(leadRow).eq("id", lead.id), leadRow);
     if (error) throw error;
   } else {
-    const { data, error } = await saveLeadRowWithHookFallback(() => supabase.from("leads").upsert(leadRow, { onConflict: "meta_contact_id" }).select("id").single(), leadRow);
-    if (error) throw error;
-    savedId = data.id;
+    const existingByUrl = await findExistingLeadByMetaUrl(leadRow.meta_url);
+    if (existingByUrl?.id) {
+      const { error } = await saveLeadRowWithHookFallback(() => supabase.from("leads").update({
+        ...leadRow,
+        first_message_at: existingByUrl.first_message_at || leadRow.first_message_at
+      }).eq("id", existingByUrl.id), leadRow);
+      if (error) throw error;
+      savedId = existingByUrl.id;
+    } else {
+      const { data, error } = await saveLeadRowWithHookFallback(() => supabase.from("leads").upsert(leadRow, { onConflict: "meta_contact_id" }).select("id").single(), leadRow);
+      if (error) throw error;
+      savedId = data.id;
+    }
   }
 
   await saveLeadTags(savedId, lead.tags || []);
   await saveLeadProducts(savedId, lead.products || [], refs);
   return { ...lead, id: savedId, metaContactId: leadRow.meta_contact_id };
+}
+
+async function findExistingLeadByMetaUrl(metaUrl) {
+  if (!metaUrl) return null;
+  const { data, error } = await supabase
+    .from("leads")
+    .select("id, first_message_at")
+    .eq("meta_url", metaUrl)
+    .order("created_at", { ascending: true })
+    .limit(1);
+
+  if (error) throw error;
+  return data?.[0] || null;
 }
 
 async function saveLeadRowWithHookFallback(action, leadRow) {
