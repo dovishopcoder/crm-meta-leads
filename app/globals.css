@@ -640,9 +640,10 @@
 
   .app-nav {
     display: grid;
-    grid-template-columns: 46px minmax(0, 1fr) auto;
+    grid-template-columns: 46px minmax(0, 1fr);
     align-items: center;
     gap: 8px;
+    padding-top: 2px;
   }
 
   .nav-menu-toggle {
@@ -716,14 +717,21 @@
   }
 
   .nav-brand {
-    grid-column: 3;
-    min-height: 40px;
-    max-width: 92px;
+    grid-column: 1 / -1;
+    grid-row: 1;
+    min-height: 46px;
+    max-width: 100%;
+    margin-bottom: 6px;
   }
 
   .nav-brand img {
-    height: 34px;
-    max-width: 92px;
+    height: 42px;
+    max-width: min(230px, 100%);
+  }
+
+  .nav-menu-toggle,
+  .nav-user {
+    grid-row: 2;
   }
 
   .stats-page-shell,
