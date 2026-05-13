@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AppNav } from "../components";
-import { countActiveLeadsForManager, createManager, createProduct, createStage, deleteManager, getCurrentSession, loadAdminData, loadCurrentManager, transferActiveLeads, updateManager, updateProduct, updateStage } from "../supabase-crm";
+import { countActiveLeadsForManager, createManager, createProduct, createStage, deleteManager, getCurrentSession, loadAdminData, loadCurrentManager, resetManagerPassword, transferActiveLeads, updateManager, updateProduct, updateStage } from "../supabase-crm";
 
 export default function AdminPage() {
   const [currentManager, setCurrentManager] = useState(null);
@@ -15,6 +15,7 @@ export default function AdminPage() {
   const [productForm, setProductForm] = useState({ code: "", name: "" });
   const [editing, setEditing] = useState(null);
   const [editForm, setEditForm] = useState({});
+  const [passwordDrafts, setPasswordDrafts] = useState({});
   const [transferPrompt, setTransferPrompt] = useState(null);
   const [audienceFilters, setAudienceFilters] = useState({ stage: "all", manager: "all", product: "all", status: "active" });
 
@@ -149,6 +150,12 @@ export default function AdminPage() {
     await submitAdminAction(() => deleteManager(manager.id), "Managerul a fost sters.");
   }
 
+  async function handleResetPassword(manager) {
+    const password = passwordDrafts[manager.id] || "";
+    await submitAdminAction(() => resetManagerPassword(manager.id, password), `Parola pentru ${manager.name} a fost schimbata.`);
+    setPasswordDrafts((drafts) => ({ ...drafts, [manager.id]: "" }));
+  }
+
   if (!loaded) return null;
 
   return (
@@ -215,6 +222,9 @@ export default function AdminPage() {
             onSave={saveEdit}
             onCancel={cancelEdit}
             onDelete={handleDeleteManager}
+            onPasswordChange={(managerId, password) => setPasswordDrafts((drafts) => ({ ...drafts, [managerId]: password }))}
+            onPasswordReset={handleResetPassword}
+            passwordDrafts={passwordDrafts}
             currentManagerId={currentManager?.id}
           />
         </section>
@@ -280,7 +290,7 @@ function slugifyInput(value) {
   return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
-function AdminTable({ title, columns, rows, type, editing, editForm, onEdit, onEditForm, onSave, onCancel, onDelete, currentManagerId }) {
+function AdminTable({ title, columns, rows, type, editing, editForm, onEdit, onEditForm, onSave, onCancel, onDelete, onPasswordChange, onPasswordReset, passwordDrafts = {}, currentManagerId }) {
   return (
     <section className="stats-table-card admin-card">
       <h3>{title}</h3>
@@ -307,6 +317,19 @@ function AdminTable({ title, columns, rows, type, editing, editForm, onEdit, onE
                   ) : (
                     <div className="table-actions">
                       <button className="mini-btn primary" type="button" onClick={() => onEdit(type, row)}>Editeaza</button>
+                      {type === "manager" && (
+                        <>
+                          <input
+                            className="table-input password-reset-input"
+                            type="password"
+                            minLength={6}
+                            value={passwordDrafts[row.id] || ""}
+                            onChange={(event) => onPasswordChange(row.id, event.target.value)}
+                            placeholder="Parola noua"
+                          />
+                          <button className="mini-btn" type="button" onClick={() => onPasswordReset(row)} disabled={(passwordDrafts[row.id] || "").length < 6}>Schimba parola</button>
+                        </>
+                      )}
                       {type === "manager" && row.id !== currentManagerId && (
                         <button className="mini-btn danger" type="button" onClick={() => onDelete(row)}>Sterge</button>
                       )}

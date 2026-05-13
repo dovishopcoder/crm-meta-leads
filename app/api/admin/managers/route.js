@@ -155,6 +155,78 @@ export async function DELETE(request) {
   }
 }
 
+export async function PATCH(request) {
+  try {
+    const token = getBearerToken(request);
+    if (!token) {
+      return NextResponse.json({ error: "Sesiunea admin lipseste." }, { status: 401 });
+    }
+
+    const supabase = serverSupabase();
+    const authClient = publicSupabase();
+    const { data: userData, error: userError } = await authClient.auth.getUser(token);
+    if (userError || !userData.user?.email) {
+      return NextResponse.json({ error: "Sesiunea admin nu este valida." }, { status: 401 });
+    }
+
+    const { data: adminManager, error: adminError } = await supabase
+      .from("managers")
+      .select("id, role, active")
+      .eq("email", userData.user.email)
+      .maybeSingle();
+
+    if (adminError) throw adminError;
+    if (adminManager?.role !== "admin" || !adminManager.active) {
+      return NextResponse.json({ error: "Doar adminul poate schimba parole." }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const managerId = String(body.managerId || "").trim();
+    const password = String(body.password || "");
+
+    if (!managerId || !password) {
+      return NextResponse.json({ error: "Alege managerul si parola noua." }, { status: 400 });
+    }
+
+    if (password.length < 6) {
+      return NextResponse.json({ error: "Parola trebuie sa aiba minim 6 caractere." }, { status: 400 });
+    }
+
+    const { data: manager, error: managerError } = await supabase
+      .from("managers")
+      .select("id, email, auth_user_id")
+      .eq("id", managerId)
+      .maybeSingle();
+
+    if (managerError) throw managerError;
+    if (!manager) {
+      return NextResponse.json({ error: "Managerul nu exista." }, { status: 404 });
+    }
+
+    let authUserId = manager.auth_user_id;
+    if (!authUserId && manager.email) {
+      const { data: authUsers, error: listError } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      if (listError) throw listError;
+      authUserId = authUsers.users.find((user) => user.email?.toLowerCase() === manager.email.toLowerCase())?.id;
+    }
+
+    if (!authUserId) {
+      return NextResponse.json({ error: "Userul Auth pentru acest manager nu a fost gasit." }, { status: 404 });
+    }
+
+    const { error: updateError } = await supabase.auth.admin.updateUserById(authUserId, { password });
+    if (updateError) throw updateError;
+
+    if (!manager.auth_user_id) {
+      await supabase.from("managers").update({ auth_user_id: authUserId }).eq("id", manager.id);
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return NextResponse.json({ error: error.message || "Nu s-a putut schimba parola." }, { status: 500 });
+  }
+}
+
 function getBearerToken(request) {
   const header = request.headers.get("authorization") || "";
   const match = header.match(/^Bearer\s+(.+)$/i);

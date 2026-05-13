@@ -388,6 +388,11 @@
   background: #fff;
 }
 
+.password-reset-input {
+  width: 138px;
+  min-width: 118px;
+}
+
 .connection-banner {
   display: flex;
   justify-content: space-between;
