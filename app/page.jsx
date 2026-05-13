@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AppNav } from "./components";
-import { getCurrentSession, loadCrmConfig, loadCurrentManager, loadSupabaseLeads, saveSupabaseLead } from "./supabase-crm";
+import { getCurrentSession, loadCrmConfig, loadCurrentManager, loadSupabaseLeads, saveSupabaseLead, supabase } from "./supabase-crm";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const FALLBACK_MANAGER_ID = "diana";
@@ -165,6 +165,7 @@ export default function HomePage() {
   const [currentManager, setCurrentManager] = useState(null);
   const [crmConfig, setCrmConfig] = useState({ managers, stages, products });
   const [dataSource, setDataSource] = useState("loading");
+  const [loadError, setLoadError] = useState("");
   const [saveState, setSaveState] = useState("idle");
   const [saveError, setSaveError] = useState("");
   const [selectedId, setSelectedId] = useState(null);
@@ -192,18 +193,29 @@ export default function HomePage() {
         }
 
         const manager = await loadCurrentManager();
+        if (!manager?.active) {
+          throw new Error("Contul logat nu este manager activ in CRM. Fa logout si intra cu emailul corect.");
+        }
         setCurrentManager(manager);
         setCrmConfig(await loadCrmConfig());
         const remoteLeads = await loadSupabaseLeads();
         setLeads(remoteLeads);
         setDataSource("supabase");
+        setLoadError("");
       } catch (error) {
-        console.warn("Supabase fallback:", error.message);
-        const stored = window.localStorage.getItem("crm-next-leads") || window.localStorage.getItem("crm-leads");
-        const initial = stored ? JSON.parse(stored).map(normalizeLead) : makeDefaultLeads();
-        setLeads(initial);
-        setCrmConfig({ managers, stages, products });
-        setDataSource("local");
+        console.warn("Supabase load error:", error.message);
+        if (!supabase) {
+          const stored = window.localStorage.getItem("crm-next-leads") || window.localStorage.getItem("crm-leads");
+          const initial = stored ? JSON.parse(stored).map(normalizeLead) : makeDefaultLeads();
+          setLeads(initial);
+          setCrmConfig({ managers, stages, products });
+          setDataSource("local");
+          setLoadError("");
+          return;
+        }
+        setLeads([]);
+        setDataSource("error");
+        setLoadError(error.message || "Supabase nu raspunde.");
       } finally {
         setLoaded(true);
       }
@@ -555,8 +567,8 @@ export default function HomePage() {
 
       <section className={`calendar-panel ${mobileView !== "calendar" ? "mobile-hidden" : ""}`}>
         <div className={`connection-banner ${dataSource === "supabase" ? "online" : "offline"}`}>
-          <span>{dataSource === "supabase" ? "Conectat la Supabase" : "Mod local"}</span>
-          <span>{saveState === "saving" ? "Se salveaza..." : saveState === "saved" ? "Salvat" : saveState === "error" ? `Eroare: ${saveError || "salvare esuata"}` : "Gata"}</span>
+          <span>{dataSource === "supabase" ? "Conectat la Supabase" : dataSource === "error" ? "Eroare Supabase" : "Mod local"}</span>
+          <span>{loadError || (saveState === "saving" ? "Se salveaza..." : saveState === "saved" ? "Salvat" : saveState === "error" ? `Eroare: ${saveError || "salvare esuata"}` : "Gata")}</span>
         </div>
 
         <header className="calendar-toolbar">

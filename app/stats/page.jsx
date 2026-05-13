@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { AppNav, StatsPanel } from "../components";
 import { buildStats, loadStoredLeads, managers, products, stages } from "../crm-data";
-import { getCurrentSession, loadCrmConfig, loadCurrentManager, loadSupabaseLeads } from "../supabase-crm";
+import { getCurrentSession, loadCrmConfig, loadCurrentManager, loadSupabaseLeads, supabase } from "../supabase-crm";
 
 export default function StatsPage() {
   const [leads, setLeads] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [dataSource, setDataSource] = useState("loading");
+  const [loadError, setLoadError] = useState("");
   const [currentManager, setCurrentManager] = useState(null);
   const [crmConfig, setCrmConfig] = useState({ managers, stages, products });
 
@@ -21,14 +22,26 @@ export default function StatsPage() {
           return;
         }
 
-        setCurrentManager(await loadCurrentManager());
+        const manager = await loadCurrentManager();
+        if (!manager?.active) {
+          throw new Error("Contul logat nu este manager activ in CRM.");
+        }
+        setCurrentManager(manager);
         setCrmConfig(await loadCrmConfig());
         setLeads(await loadSupabaseLeads());
         setDataSource("supabase");
-      } catch {
-        setLeads(loadStoredLeads());
-        setCrmConfig({ managers, stages, products });
-        setDataSource("local");
+        setLoadError("");
+      } catch (error) {
+        if (!supabase) {
+          setLeads(loadStoredLeads());
+          setCrmConfig({ managers, stages, products });
+          setDataSource("local");
+          setLoadError("");
+          return;
+        }
+        setLeads([]);
+        setDataSource("error");
+        setLoadError(error.message || "Supabase nu raspunde.");
       } finally {
         setLoaded(true);
       }
@@ -45,8 +58,8 @@ export default function StatsPage() {
     <main className="stats-page-shell">
       <AppNav active="stats" manager={currentManager} />
       <div className={`connection-banner ${dataSource === "supabase" ? "online" : "offline"}`}>
-        <span>{dataSource === "supabase" ? "Conectat la Supabase" : "Mod local"}</span>
-        <span>Statistici actualizate</span>
+        <span>{dataSource === "supabase" ? "Conectat la Supabase" : dataSource === "error" ? "Eroare Supabase" : "Mod local"}</span>
+        <span>{loadError || "Statistici actualizate"}</span>
       </div>
       <StatsPanel stats={stats} />
     </main>
