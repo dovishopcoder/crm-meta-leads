@@ -38,6 +38,13 @@ export const religions = [
   { id: "alta", name: "Alta" }
 ];
 
+export const hooks = [
+  { id: "sanatate", name: "Sanatate" },
+  { id: "familie", name: "Familie" },
+  { id: "intrebari-teologice", name: "Intrebari teologice" },
+  { id: "critice", name: "Critice" }
+];
+
 export function makeDefaultLeads() {
   return [
     {
@@ -193,6 +200,7 @@ export function normalizeLead(lead) {
     products: Array.isArray(lead.products) ? lead.products.map((item) => (typeof item === "string" ? { id: item, status: "proposed", proposedAt: now, managerId: lead.managerId || "unassigned" } : item)) : [],
     email: lead.email || "",
     customerEmail: lead.customerEmail || "",
+    hook: lead.hook || "",
     activity: Array.isArray(lead.activity) ? lead.activity : []
   };
 }

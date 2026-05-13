@@ -1,7 +1,7 @@
 "use client";
 
 import { createClient } from "@supabase/supabase-js";
-import { leadStatuses, makeDefaultLeads, managers, products, religions, stages } from "./crm-data.js";
+import { hooks, leadStatuses, makeDefaultLeads, managers, products, religions, stages } from "./crm-data.js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -144,6 +144,13 @@ export async function loadCrmConfig() {
       name: religion.name,
       position: religion.position,
       active: religion.active
+    })),
+    hooks: (data.hooks || hooks).map((hook) => ({
+      id: hook.code || hook.id,
+      uuid: hook.id,
+      name: hook.name,
+      position: hook.position,
+      active: hook.active
     }))
   };
 }
@@ -226,6 +233,10 @@ export async function createReligion({ code, name, position }) {
   return saveAdminSetting("POST", { type: "religion", code, name, position, active: true });
 }
 
+export async function createHook({ code, name, position }) {
+  return saveAdminSetting("POST", { type: "hook", code, name, position, active: true });
+}
+
 export async function updateManager(id, { name, email, role, color, active }) {
   if (!supabase) throw new Error("Supabase nu este configurat.");
   const { error } = await supabase.from("managers").update({ name, email, role, color, active }).eq("id", id);
@@ -269,6 +280,10 @@ export async function updateLeadStatus(id, { code, name, position, active }) {
 
 export async function updateReligion(id, { code, name, position, active }) {
   return saveAdminSetting("PATCH", { id, type: "religion", code, name, position, active });
+}
+
+export async function updateHook(id, { code, name, position, active }) {
+  return saveAdminSetting("PATCH", { id, type: "hook", code, name, position, active });
 }
 
 async function saveAdminSetting(method, body) {
@@ -326,6 +341,7 @@ export async function saveSupabaseLead(lead) {
     meta_url_verified: Boolean(lead.metaUrlVerified),
     email: lead.customerEmail || null,
     customer_email: lead.customerEmail || null,
+    hook: lead.hook || null,
     phone: lead.phone || null,
     notes: lead.notes || null,
     status: lead.status,
@@ -345,10 +361,10 @@ export async function saveSupabaseLead(lead) {
   let savedId = lead.id;
 
   if (isUuid(lead.id)) {
-    const { error } = await supabase.from("leads").update(leadRow).eq("id", lead.id);
+    const { error } = await saveLeadRowWithHookFallback(() => supabase.from("leads").update(leadRow).eq("id", lead.id), leadRow);
     if (error) throw error;
   } else {
-    const { data, error } = await supabase.from("leads").upsert(leadRow, { onConflict: "meta_contact_id" }).select("id").single();
+    const { data, error } = await saveLeadRowWithHookFallback(() => supabase.from("leads").upsert(leadRow, { onConflict: "meta_contact_id" }).select("id").single(), leadRow);
     if (error) throw error;
     savedId = data.id;
   }
@@ -356,6 +372,13 @@ export async function saveSupabaseLead(lead) {
   await saveLeadTags(savedId, lead.tags || []);
   await saveLeadProducts(savedId, lead.products || [], refs);
   return { ...lead, id: savedId, metaContactId: leadRow.meta_contact_id };
+}
+
+async function saveLeadRowWithHookFallback(action, leadRow) {
+  const result = await action();
+  if (!result.error || !isMissingHookColumnError(result.error)) return result;
+  delete leadRow.hook;
+  return action();
 }
 
 async function ensureReferenceData() {
@@ -437,6 +460,10 @@ function isMissingTableError(error) {
   return error?.code === "42P01" || /schema cache|does not exist|Could not find the table/i.test(error?.message || "");
 }
 
+function isMissingHookColumnError(error) {
+  return error?.code === "PGRST204" && /hook/i.test(error?.message || "");
+}
+
 async function seedDemoLeads(refs) {
   for (const lead of makeDefaultLeads()) {
     await saveSupabaseLead(lead, refs);
@@ -454,6 +481,7 @@ function fromSupabaseLead(row, refs) {
     metaUrlVerified: Boolean(row.meta_url_verified),
     email: row.email || "",
     customerEmail: row.customer_email || "",
+    hook: row.hook || "",
     status: row.status,
     unread: row.unread,
     archived: Boolean(row.archived_at),

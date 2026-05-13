@@ -9,7 +9,8 @@ const TABLES = {
   stage: "stages",
   product: "products",
   status: "lead_statuses",
-  religion: "religions"
+  religion: "religions",
+  hook: "hook_options"
 };
 
 const DEFAULT_STATUSES = [
@@ -26,6 +27,13 @@ const DEFAULT_RELIGIONS = [
   { code: "alta", name: "Alta", position: 4, active: true }
 ];
 
+const DEFAULT_HOOKS = [
+  { code: "sanatate", name: "Sanatate", position: 1, active: true },
+  { code: "familie", name: "Familie", position: 2, active: true },
+  { code: "intrebari-teologice", name: "Intrebari teologice", position: 3, active: true },
+  { code: "critice", name: "Critice", position: 4, active: true }
+];
+
 function serverSupabase() {
   if (!supabaseUrl || !serviceRoleKey) throw new Error("Supabase server env is missing.");
   return createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
@@ -39,21 +47,22 @@ function publicSupabase() {
 export async function GET(request) {
   try {
     const supabase = serverSupabase();
-    await requireAdmin(request, supabase);
+    await requireManager(request, supabase);
 
-    const [managerResult, stageResult, productResult, statusResult, religionResult, audienceResult] = await Promise.all([
+    const [managerResult, stageResult, productResult, statusResult, religionResult, hookResult, audienceResult] = await Promise.all([
       supabase.from("managers").select("id, name, email, role, color, active, created_at").order("created_at", { ascending: true }),
       supabase.from("stages").select("id, code, name, position, active, created_at").order("position", { ascending: true }),
       supabase.from("products").select("id, code, name, active, created_at").order("created_at", { ascending: true }),
       loadOptionRows(supabase, "lead_statuses", DEFAULT_STATUSES),
       loadOptionRows(supabase, "religions", DEFAULT_RELIGIONS),
+      loadOptionRows(supabase, "hook_options", DEFAULT_HOOKS),
       supabase
         .from("leads")
         .select("id, name, platform, customer_email, meta_email, meta_contact_id, phone, first_message_at, archived_at, managers(name), stages(code, name), lead_tags(tag), lead_products(products(code, name))")
         .order("created_at", { ascending: false })
     ]);
 
-    for (const result of [managerResult, stageResult, productResult, statusResult, religionResult, audienceResult]) {
+    for (const result of [managerResult, stageResult, productResult, statusResult, religionResult, hookResult, audienceResult]) {
       if (result.error) throw result.error;
     }
 
@@ -63,6 +72,7 @@ export async function GET(request) {
       products: productResult.data || [],
       statuses: statusResult.data || [],
       religions: religionResult.data || [],
+      hooks: hookResult.data || [],
       audienceLeads: (audienceResult.data || []).map(toAudienceLead)
     });
   } catch (error) {
@@ -116,6 +126,11 @@ export async function PATCH(request) {
 }
 
 async function requireAdmin(request, supabase) {
+  const manager = await requireManager(request, supabase);
+  if (manager.role !== "admin") throw new Error("Doar adminul poate modifica setarile.");
+}
+
+async function requireManager(request, supabase) {
   const token = getBearerToken(request);
   if (!token) throw new Error("Sesiunea admin lipseste.");
 
@@ -130,7 +145,8 @@ async function requireAdmin(request, supabase) {
     .maybeSingle();
 
   if (adminError) throw adminError;
-  if (adminManager?.role !== "admin" || !adminManager.active) throw new Error("Doar adminul poate modifica setarile.");
+  if (!adminManager?.active) throw new Error("Contul logat nu este manager activ.");
+  return adminManager;
 }
 
 function buildPayload(type, body) {

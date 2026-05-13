@@ -45,6 +45,13 @@ const religions = [
   { id: "alta", name: "Alta" }
 ];
 
+const hooks = [
+  { id: "sanatate", name: "Sanatate" },
+  { id: "familie", name: "Familie" },
+  { id: "intrebari-teologice", name: "Intrebari teologice" },
+  { id: "critice", name: "Critice" }
+];
+
 function makeDefaultLeads() {
   return [
     {
@@ -177,7 +184,7 @@ export default function HomePage() {
   const [leads, setLeads] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [currentManager, setCurrentManager] = useState(null);
-  const [crmConfig, setCrmConfig] = useState({ managers, stages, products, statuses: leadStatuses, religions });
+  const [crmConfig, setCrmConfig] = useState({ managers, stages, products, statuses: leadStatuses, religions, hooks });
   const [dataSource, setDataSource] = useState("loading");
   const [loadError, setLoadError] = useState("");
   const [saveState, setSaveState] = useState("idle");
@@ -224,7 +231,7 @@ export default function HomePage() {
           const stored = window.localStorage.getItem("crm-next-leads") || window.localStorage.getItem("crm-leads");
           const initial = stored ? JSON.parse(stored).map(normalizeLead) : makeDefaultLeads();
           setLeads(initial);
-          setCrmConfig({ managers, stages, products, statuses: leadStatuses, religions });
+          setCrmConfig({ managers, stages, products, statuses: leadStatuses, religions, hooks });
           setDataSource("local");
           setLoadError("");
           return;
@@ -267,6 +274,7 @@ export default function HomePage() {
   const activeProducts = crmConfig.products.filter((product) => product.active);
   const activeStatuses = (crmConfig.statuses || leadStatuses).filter((status) => status.active);
   const activeReligions = (crmConfig.religions || religions).filter((religion) => religion.active);
+  const activeHooks = (crmConfig.hooks || hooks).filter((hook) => hook.active);
 
   function managerForConfig(id) {
     return crmConfig.managers.find((manager) => manager.code === id) || managerFor(id);
@@ -343,6 +351,7 @@ export default function HomePage() {
       metaUrlVerified: true,
       email: "",
       customerEmail: "",
+      hook: manualLead.hook,
       status: "new",
       unread: true,
       archived: false,
@@ -357,7 +366,7 @@ export default function HomePage() {
       activity: [{ type: "manual_created", at: now, managerId: manualLead.managerId }],
       managerId: manualLead.managerId,
       priority: manualLead.priority,
-      tags: manualLead.tags.split(",").map((tag) => tag.trim()).filter(Boolean),
+      tags: [],
       phone: manualLead.phone.trim(),
       notes: manualLead.notes.trim(),
       followDate: ""
@@ -395,6 +404,7 @@ export default function HomePage() {
       followDate: lead.followDate || "",
       stage: lead.stage || "new",
       tags: (lead.tags || []).join(", "),
+      hook: lead.hook || "",
       metaUrl: lead.metaUrlVerified ? lead.metaUrl || "" : "",
       metaUrlVerified: Boolean(lead.metaUrlVerified),
       customerEmail: lead.customerEmail || "",
@@ -455,6 +465,7 @@ export default function HomePage() {
       lead.followDate = draft.followDate;
       lead.stage = draft.stage;
       lead.tags = draft.tags.split(",").map((tag) => tag.trim()).filter(Boolean);
+      lead.hook = draft.hook;
       lead.products = selectedProducts;
       lead.customerEmail = draft.customerEmail.trim();
       lead.phone = draft.phone.trim();
@@ -661,7 +672,7 @@ export default function HomePage() {
           requiresFollowUp={modalSource === "inbox" && selectedLead.unread}
           requiresMetaLink={modalSource === "inbox" && selectedLead.unread && !selectedLead.metaUrlVerified}
           warning={warning}
-          config={{ managers: activeManagers, stages: activeStages, products: activeProducts, statuses: activeStatuses, religions: activeReligions }}
+          config={{ managers: activeManagers, stages: activeStages, products: activeProducts, statuses: activeStatuses, religions: activeReligions, hooks: activeHooks }}
           isAdmin={currentManager?.role === "admin"}
           lookups={{ managerForConfig, stageForConfig, productForConfig, statusForConfig }}
           onChange={setDraft}
@@ -676,7 +687,7 @@ export default function HomePage() {
           draft={manualLead}
           error={manualError}
           managers={activeManagers}
-          religions={activeReligions}
+          hooks={activeHooks}
           onChange={setManualLead}
           onClose={() => { setManualLeadOpen(false); setManualError(""); }}
           onSubmit={createManualLead}
@@ -748,7 +759,7 @@ function Avatar({ lead, className = "" }) {
   return <img className={className || "avatar"} src={avatarSrc(lead.avatar)} alt="" onError={() => setFailed(true)} />;
 }
 
-function ManualLeadModal({ draft, error, managers, religions, onChange, onClose, onSubmit }) {
+function ManualLeadModal({ draft, error, managers, hooks, onChange, onClose, onSubmit }) {
   function update(field, value) {
     onChange({ ...draft, [field]: value });
   }
@@ -777,7 +788,7 @@ function ManualLeadModal({ draft, error, managers, religions, onChange, onClose,
 
           <div className="field-grid">
             <label>Telefon<input value={draft.phone} onChange={(event) => update("phone", event.target.value)} placeholder="+373..." /></label>
-            <label>Religie<select value={draft.tags} onChange={(event) => update("tags", event.target.value)}><option value="">Neindicat</option>{religions.map((religion) => <option key={religion.id} value={religion.name}>{religion.name}</option>)}</select></label>
+            <label>Hook<select value={draft.hook} onChange={(event) => update("hook", event.target.value)}><option value="">Neindicat</option>{hooks.map((hook) => <option key={hook.id} value={hook.id}>{hook.name}</option>)}</select></label>
           </div>
 
           <label>Comentarii<textarea value={draft.notes} onChange={(event) => update("notes", event.target.value)} rows={4} placeholder="Note interne despre client" /></label>
@@ -851,8 +862,10 @@ function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning,
 
           <div className="field-grid">
             <label>Religie<select value={draft.tags} onChange={(event) => update("tags", event.target.value)}><option value="">Neindicat</option>{config.religions.map((religion) => <option key={religion.id} value={religion.name}>{religion.name}</option>)}</select></label>
-            <label>Produs propus<select value={draft.products[0] || ""} onChange={(event) => update("products", event.target.value ? [event.target.value] : [])}><option value="">Niciun produs</option>{config.products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>
+            <label>Hook<select value={draft.hook} onChange={(event) => update("hook", event.target.value)}><option value="">Neindicat</option>{config.hooks.map((hook) => <option key={hook.id} value={hook.id}>{hook.name}</option>)}</select></label>
           </div>
+
+          <label>Produs propus<select value={draft.products[0] || ""} onChange={(event) => update("products", event.target.value ? [event.target.value] : [])}><option value="">Niciun produs</option>{config.products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>
 
           <div className="client-meta-grid">
             <span>Creat: {formatDateTime(lead.createdAt)}</span>
@@ -1086,6 +1099,7 @@ function makeEmptyManualLead() {
     managerId: "unassigned",
     priority: "normal",
     phone: "",
+    hook: "",
     tags: "",
     notes: ""
   };

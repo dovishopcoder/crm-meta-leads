@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { AppNav } from "../components";
-import { countActiveLeadsForManager, createLeadStatus, createManager, createProduct, createReligion, createStage, deleteManager, getCurrentSession, loadAdminData, loadCurrentManager, resetManagerPassword, transferActiveLeads, updateLeadStatus, updateManager, updateProduct, updateReligion, updateStage } from "../supabase-crm";
+import { countActiveLeadsForManager, createHook, createLeadStatus, createManager, createProduct, createReligion, createStage, deleteManager, getCurrentSession, loadAdminData, loadCurrentManager, resetManagerPassword, transferActiveLeads, updateHook, updateLeadStatus, updateManager, updateProduct, updateReligion, updateStage } from "../supabase-crm";
 
 export default function AdminPage() {
   const [currentManager, setCurrentManager] = useState(null);
-  const [adminData, setAdminData] = useState({ managers: [], stages: [], products: [], statuses: [], religions: [] });
+  const [adminData, setAdminData] = useState({ managers: [], stages: [], products: [], statuses: [], religions: [], hooks: [] });
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -15,6 +15,7 @@ export default function AdminPage() {
   const [productForm, setProductForm] = useState({ code: "", name: "" });
   const [statusForm, setStatusForm] = useState({ code: "", name: "", position: "" });
   const [religionForm, setReligionForm] = useState({ code: "", name: "", position: "" });
+  const [hookForm, setHookForm] = useState({ code: "", name: "", position: "" });
   const [editing, setEditing] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [passwordDrafts, setPasswordDrafts] = useState({});
@@ -94,6 +95,15 @@ export default function AdminPage() {
     setReligionForm({ code: "", name: "", position: "" });
   }
 
+  async function handleCreateHook(event) {
+    event.preventDefault();
+    await submitAdminAction(async () => {
+      const hook = await createHook(hookForm);
+      addSettingRow("hooks", hook);
+    }, "Hook adaugat.", { refresh: false });
+    setHookForm({ code: "", name: "", position: "" });
+  }
+
   function addSettingRow(key, row) {
     if (!row?.id) return;
     setAdminData((current) => ({
@@ -145,7 +155,8 @@ export default function AdminPage() {
       stage: () => updateStage(editing.id, editForm),
       product: () => updateProduct(editing.id, editForm),
       status: () => updateLeadStatus(editing.id, editForm),
-      religion: () => updateReligion(editing.id, editForm)
+      religion: () => updateReligion(editing.id, editForm),
+      hook: () => updateHook(editing.id, editForm)
     };
 
     await submitAdminAction(actions[editing.type], "Modificarile au fost salvate.");
@@ -278,6 +289,28 @@ export default function AdminPage() {
             columns={["Cod", "Nume", "Pozitie", "Activ"]}
             rows={adminData.statuses}
             type="status"
+            editing={editing}
+            editForm={editForm}
+            onEdit={startEdit}
+            onEditForm={setEditForm}
+            onSave={saveEdit}
+            onCancel={cancelEdit}
+          />
+        </section>
+
+        <section className="admin-card">
+          <h3>Adauga hook</h3>
+          <form className="admin-form" onSubmit={handleCreateHook}>
+            <input value={hookForm.code} onChange={(event) => setHookForm({ ...hookForm, code: slugifyInput(event.target.value) })} placeholder="cod-hook" required />
+            <input value={hookForm.name} onChange={(event) => setHookForm({ ...hookForm, name: event.target.value })} placeholder="Nume hook" required />
+            <input type="number" value={hookForm.position} onChange={(event) => setHookForm({ ...hookForm, position: event.target.value })} placeholder="Pozitie" required />
+            <button className="primary-btn" type="submit">Adauga</button>
+          </form>
+          <AdminTable
+            title="Hook-uri"
+            columns={["Cod", "Nume", "Pozitie", "Activ"]}
+            rows={adminData.hooks}
+            type="hook"
             editing={editing}
             editForm={editForm}
             onEdit={startEdit}
@@ -520,7 +553,7 @@ function ReadOnlyCells({ type, row }) {
     );
   }
 
-  if (type === "stage" || type === "status" || type === "religion") {
+  if (type === "stage" || type === "status" || type === "religion" || type === "hook") {
     return (
       <>
         <td>{row.code}</td>
@@ -556,7 +589,7 @@ function EditableCells({ type, form, onChange }) {
     );
   }
 
-  if (type === "stage" || type === "status" || type === "religion") {
+  if (type === "stage" || type === "status" || type === "religion" || type === "hook") {
     return (
       <>
         <td><input className="table-input" value={form.code || ""} onChange={(event) => update("code", slugifyInput(event.target.value))} /></td>
