@@ -2,17 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { AppNav } from "../components";
-import { countActiveLeadsForManager, createManager, createProduct, createStage, deleteManager, getCurrentSession, loadAdminData, loadCurrentManager, resetManagerPassword, transferActiveLeads, updateManager, updateProduct, updateStage } from "../supabase-crm";
+import { countActiveLeadsForManager, createLeadStatus, createManager, createProduct, createReligion, createStage, deleteManager, getCurrentSession, loadAdminData, loadCurrentManager, resetManagerPassword, transferActiveLeads, updateLeadStatus, updateManager, updateProduct, updateReligion, updateStage } from "../supabase-crm";
 
 export default function AdminPage() {
   const [currentManager, setCurrentManager] = useState(null);
-  const [adminData, setAdminData] = useState({ managers: [], stages: [], products: [] });
+  const [adminData, setAdminData] = useState({ managers: [], stages: [], products: [], statuses: [], religions: [] });
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [managerForm, setManagerForm] = useState({ name: "", email: "", password: "", role: "manager", color: "#1e8f72" });
   const [stageForm, setStageForm] = useState({ code: "", name: "", position: "" });
   const [productForm, setProductForm] = useState({ code: "", name: "" });
+  const [statusForm, setStatusForm] = useState({ code: "", name: "", position: "" });
+  const [religionForm, setReligionForm] = useState({ code: "", name: "", position: "" });
   const [editing, setEditing] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [passwordDrafts, setPasswordDrafts] = useState({});
@@ -68,6 +70,18 @@ export default function AdminPage() {
     setProductForm({ code: "", name: "" });
   }
 
+  async function handleCreateStatus(event) {
+    event.preventDefault();
+    await submitAdminAction(() => createLeadStatus(statusForm), "Status adaugat.");
+    setStatusForm({ code: "", name: "", position: "" });
+  }
+
+  async function handleCreateReligion(event) {
+    event.preventDefault();
+    await submitAdminAction(() => createReligion(religionForm), "Religie adaugata.");
+    setReligionForm({ code: "", name: "", position: "" });
+  }
+
   async function submitAdminAction(action, successMessage) {
     setError("");
     setMessage("");
@@ -109,7 +123,9 @@ export default function AdminPage() {
     const actions = {
       manager: () => updateManager(editing.id, editForm),
       stage: () => updateStage(editing.id, editForm),
-      product: () => updateProduct(editing.id, editForm)
+      product: () => updateProduct(editing.id, editForm),
+      status: () => updateLeadStatus(editing.id, editForm),
+      religion: () => updateReligion(editing.id, editForm)
     };
 
     await submitAdminAction(actions[editing.type], "Modificarile au fost salvate.");
@@ -226,6 +242,50 @@ export default function AdminPage() {
             onPasswordReset={handleResetPassword}
             passwordDrafts={passwordDrafts}
             currentManagerId={currentManager?.id}
+          />
+        </section>
+
+        <section className="admin-card">
+          <h3>Adauga status</h3>
+          <form className="admin-form" onSubmit={handleCreateStatus}>
+            <input value={statusForm.code} onChange={(event) => setStatusForm({ ...statusForm, code: slugifyInput(event.target.value) })} placeholder="cod-status" required />
+            <input value={statusForm.name} onChange={(event) => setStatusForm({ ...statusForm, name: event.target.value })} placeholder="Nume status" required />
+            <input type="number" value={statusForm.position} onChange={(event) => setStatusForm({ ...statusForm, position: event.target.value })} placeholder="Pozitie" required />
+            <button className="primary-btn" type="submit">Adauga</button>
+          </form>
+          <AdminTable
+            title="Status lead"
+            columns={["Cod", "Nume", "Pozitie", "Activ"]}
+            rows={adminData.statuses}
+            type="status"
+            editing={editing}
+            editForm={editForm}
+            onEdit={startEdit}
+            onEditForm={setEditForm}
+            onSave={saveEdit}
+            onCancel={cancelEdit}
+          />
+        </section>
+
+        <section className="admin-card">
+          <h3>Adauga religie</h3>
+          <form className="admin-form" onSubmit={handleCreateReligion}>
+            <input value={religionForm.code} onChange={(event) => setReligionForm({ ...religionForm, code: slugifyInput(event.target.value) })} placeholder="cod-religie" required />
+            <input value={religionForm.name} onChange={(event) => setReligionForm({ ...religionForm, name: event.target.value })} placeholder="Nume religie" required />
+            <input type="number" value={religionForm.position} onChange={(event) => setReligionForm({ ...religionForm, position: event.target.value })} placeholder="Pozitie" required />
+            <button className="primary-btn" type="submit">Adauga</button>
+          </form>
+          <AdminTable
+            title="Religii"
+            columns={["Cod", "Nume", "Pozitie", "Activa"]}
+            rows={adminData.religions}
+            type="religion"
+            editing={editing}
+            editForm={editForm}
+            onEdit={startEdit}
+            onEditForm={setEditForm}
+            onSave={saveEdit}
+            onCancel={cancelEdit}
           />
         </section>
 
@@ -440,7 +500,7 @@ function ReadOnlyCells({ type, row }) {
     );
   }
 
-  if (type === "stage") {
+  if (type === "stage" || type === "status" || type === "religion") {
     return (
       <>
         <td>{row.code}</td>
@@ -476,7 +536,7 @@ function EditableCells({ type, form, onChange }) {
     );
   }
 
-  if (type === "stage") {
+  if (type === "stage" || type === "status" || type === "religion") {
     return (
       <>
         <td><input className="table-input" value={form.code || ""} onChange={(event) => update("code", slugifyInput(event.target.value))} /></td>

@@ -24,6 +24,20 @@ export const products = [
   { id: "consultation", name: "Consultatie" }
 ];
 
+export const leadStatuses = [
+  { id: "new", name: "Nou" },
+  { id: "scheduled", name: "Programat" },
+  { id: "contacted", name: "Contactat" },
+  { id: "closed", name: "Inchis" }
+];
+
+export const religions = [
+  { id: "adventist", name: "Adventist" },
+  { id: "ortodox", name: "Ortodox" },
+  { id: "catolic", name: "Catolic" },
+  { id: "alta", name: "Alta" }
+];
+
 export function makeDefaultLeads() {
   return [
     {
@@ -226,6 +240,10 @@ export function productFor(id) {
   return products.find((product) => product.id === id) || { id, name: id };
 }
 
+export function leadStatusFor(id) {
+  return leadStatuses.find((status) => status.id === id) || { id, name: id || "Nou" };
+}
+
 export function getVisibleDates(cursorDate, view) {
   const count = view === "day" ? 1 : view === "month" ? 30 : 7;
   return Array.from({ length: count }, (_, index) => addDays(cursorDate, index));
@@ -241,7 +259,7 @@ export function platformLabel(platform) {
 }
 
 export function statusLabel(status) {
-  return { new: "Nou", scheduled: "Programat", contacted: "Contactat", closed: "Inchis" }[status] || "Nou";
+  return leadStatusFor(status).name;
 }
 
 export function toDateKey(date) {

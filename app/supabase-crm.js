@@ -1,7 +1,7 @@
 "use client";
 
 import { createClient } from "@supabase/supabase-js";
-import { makeDefaultLeads, managers, products, stages } from "./crm-data.js";
+import { leadStatuses, makeDefaultLeads, managers, products, religions, stages } from "./crm-data.js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -45,10 +45,12 @@ export async function loadCurrentManager() {
 export async function loadAdminData() {
   if (!supabase) throw new Error("Supabase nu este configurat.");
 
-  const [managerResult, stageResult, productResult, audienceResult] = await Promise.all([
+  const [managerResult, stageResult, productResult, statusResult, religionResult, audienceResult] = await Promise.all([
     supabase.from("managers").select("id, name, email, role, color, active, created_at").order("created_at", { ascending: true }),
     supabase.from("stages").select("id, code, name, position, active, created_at").order("position", { ascending: true }),
     supabase.from("products").select("id, code, name, active, created_at").order("created_at", { ascending: true }),
+    loadOptionalOptionRows("lead_statuses", leadStatuses),
+    loadOptionalOptionRows("religions", religions),
     supabase
       .from("leads")
       .select("id, name, platform, customer_email, meta_email, meta_contact_id, phone, first_message_at, archived_at, managers(name), stages(code, name), lead_tags(tag), lead_products(products(code, name))")
@@ -64,6 +66,8 @@ export async function loadAdminData() {
     managers: managerResult.data || [],
     stages: stageResult.data || [],
     products: productResult.data || [],
+    statuses: statusResult.data || [],
+    religions: religionResult.data || [],
     audienceLeads: (audienceResult.data || []).map(toAudienceLead)
   };
 }
@@ -137,6 +141,20 @@ export async function loadCrmConfig() {
       uuid: product.id,
       name: product.name,
       active: product.active
+    })),
+    statuses: data.statuses.map((status) => ({
+      id: status.code,
+      uuid: status.id,
+      name: status.name,
+      position: status.position,
+      active: status.active
+    })),
+    religions: data.religions.map((religion) => ({
+      id: religion.code,
+      uuid: religion.id,
+      name: religion.name,
+      position: religion.position,
+      active: religion.active
     }))
   };
 }
@@ -224,6 +242,28 @@ export async function createProduct({ code, name }) {
   if (error) throw error;
 }
 
+export async function createLeadStatus({ code, name, position }) {
+  if (!supabase) throw new Error("Supabase nu este configurat.");
+  const { error } = await supabase.from("lead_statuses").insert({
+    code,
+    name,
+    position: Number(position) || 0,
+    active: true
+  });
+  if (error) throw error;
+}
+
+export async function createReligion({ code, name, position }) {
+  if (!supabase) throw new Error("Supabase nu este configurat.");
+  const { error } = await supabase.from("religions").insert({
+    code,
+    name,
+    position: Number(position) || 0,
+    active: true
+  });
+  if (error) throw error;
+}
+
 export async function updateManager(id, { name, email, role, color, active }) {
   if (!supabase) throw new Error("Supabase nu este configurat.");
   const { error } = await supabase.from("managers").update({ name, email, role, color, active }).eq("id", id);
@@ -262,6 +302,18 @@ export async function updateStage(id, { code, name, position, active }) {
 export async function updateProduct(id, { code, name, active }) {
   if (!supabase) throw new Error("Supabase nu este configurat.");
   const { error } = await supabase.from("products").update({ code, name, active }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function updateLeadStatus(id, { code, name, position, active }) {
+  if (!supabase) throw new Error("Supabase nu este configurat.");
+  const { error } = await supabase.from("lead_statuses").update({ code, name, position: Number(position) || 0, active }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function updateReligion(id, { code, name, position, active }) {
+  if (!supabase) throw new Error("Supabase nu este configurat.");
+  const { error } = await supabase.from("religions").update({ code, name, position: Number(position) || 0, active }).eq("id", id);
   if (error) throw error;
 }
 
@@ -344,6 +396,9 @@ async function ensureReferenceData() {
     active: true
   })), { onConflict: "code" });
 
+  await upsertOptionalOptionRows("lead_statuses", leadStatuses);
+  await upsertOptionalOptionRows("religions", religions);
+
   const [{ data: stageRows }, { data: productRows }, { data: managerRows }] = await Promise.all([
     supabase.from("stages").select("id, code, name"),
     supabase.from("products").select("id, code, name"),
@@ -366,6 +421,44 @@ async function ensureReferenceData() {
     managerCodeToUuid,
     managerUuidToCode
   };
+}
+
+async function loadOptionalOptionRows(table, fallbackRows) {
+  const result = await supabase
+    .from(table)
+    .select("id, code, name, position, active, created_at")
+    .order("position", { ascending: true });
+
+  if (!result.error) return result;
+  if (isMissingTableError(result.error)) {
+    return {
+      data: fallbackRows.map((row, index) => ({
+        id: row.id,
+        code: row.id,
+        name: row.name,
+        position: index + 1,
+        active: true,
+        created_at: null
+      })),
+      error: null
+    };
+  }
+  return result;
+}
+
+async function upsertOptionalOptionRows(table, rows) {
+  const { error } = await supabase.from(table).upsert(rows.map((row, index) => ({
+    code: row.id,
+    name: row.name,
+    position: index + 1,
+    active: true
+  })), { onConflict: "code" });
+
+  if (error && !isMissingTableError(error)) throw error;
+}
+
+function isMissingTableError(error) {
+  return error?.code === "42P01" || /schema cache|does not exist|Could not find the table/i.test(error?.message || "");
 }
 
 async function seedDemoLeads(refs) {

@@ -31,6 +31,20 @@ const products = [
   { id: "consultation", name: "Consultatie" }
 ];
 
+const leadStatuses = [
+  { id: "new", name: "Nou" },
+  { id: "scheduled", name: "Programat" },
+  { id: "contacted", name: "Contactat" },
+  { id: "closed", name: "Inchis" }
+];
+
+const religions = [
+  { id: "adventist", name: "Adventist" },
+  { id: "ortodox", name: "Ortodox" },
+  { id: "catolic", name: "Catolic" },
+  { id: "alta", name: "Alta" }
+];
+
 function makeDefaultLeads() {
   return [
     {
@@ -163,7 +177,7 @@ export default function HomePage() {
   const [leads, setLeads] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [currentManager, setCurrentManager] = useState(null);
-  const [crmConfig, setCrmConfig] = useState({ managers, stages, products });
+  const [crmConfig, setCrmConfig] = useState({ managers, stages, products, statuses: leadStatuses, religions });
   const [dataSource, setDataSource] = useState("loading");
   const [loadError, setLoadError] = useState("");
   const [saveState, setSaveState] = useState("idle");
@@ -210,7 +224,7 @@ export default function HomePage() {
           const stored = window.localStorage.getItem("crm-next-leads") || window.localStorage.getItem("crm-leads");
           const initial = stored ? JSON.parse(stored).map(normalizeLead) : makeDefaultLeads();
           setLeads(initial);
-          setCrmConfig({ managers, stages, products });
+          setCrmConfig({ managers, stages, products, statuses: leadStatuses, religions });
           setDataSource("local");
           setLoadError("");
           return;
@@ -251,6 +265,8 @@ export default function HomePage() {
   const activeManagers = crmConfig.managers.filter((manager) => manager.active);
   const activeStages = crmConfig.stages.filter((stage) => stage.active);
   const activeProducts = crmConfig.products.filter((product) => product.active);
+  const activeStatuses = (crmConfig.statuses || leadStatuses).filter((status) => status.active);
+  const activeReligions = (crmConfig.religions || religions).filter((religion) => religion.active);
 
   function managerForConfig(id) {
     return crmConfig.managers.find((manager) => manager.code === id) || managerFor(id);
@@ -262,6 +278,10 @@ export default function HomePage() {
 
   function productForConfig(id) {
     return crmConfig.products.find((product) => product.id === id) || productFor(id);
+  }
+
+  function statusForConfig(id) {
+    return (crmConfig.statuses || leadStatuses).find((status) => status.id === id) || { id, name: id || "Nou" };
   }
 
   function updateLead(id, updater) {
@@ -561,7 +581,7 @@ export default function HomePage() {
 
         <section className="lead-list" aria-label="Lista chat-uri necitite">
           {filteredLeads.map((lead) => (
-            <LeadCard key={lead.id} lead={lead} lookups={{ managerForConfig, stageForConfig, productForConfig }} onOpen={() => openLead(lead, "inbox")} onDragStart={(event) => event.dataTransfer.setData("text/plain", lead.id)} />
+            <LeadCard key={lead.id} lead={lead} lookups={{ managerForConfig, stageForConfig, productForConfig, statusForConfig }} onOpen={() => openLead(lead, "inbox")} onDragStart={(event) => event.dataTransfer.setData("text/plain", lead.id)} />
           ))}
           {!filteredLeads.length && <p className="empty-day">Nu exista lead-uri pentru filtrul ales.</p>}
         </section>
@@ -622,7 +642,7 @@ export default function HomePage() {
                 </header>
                 <div className="day-events">
                   {events.map((lead) => (
-                    <EventCard key={lead.id} lead={lead} lookups={{ managerForConfig, stageForConfig, productForConfig }} onOpen={() => openLead(lead, "calendar")} onDragStart={(event) => event.dataTransfer.setData("text/plain", lead.id)} />
+                    <EventCard key={lead.id} lead={lead} lookups={{ managerForConfig, stageForConfig, productForConfig, statusForConfig }} onOpen={() => openLead(lead, "calendar")} onDragStart={(event) => event.dataTransfer.setData("text/plain", lead.id)} />
                   ))}
                   {!events.length && <p className="empty-day">Liber pentru follow-up</p>}
                 </div>
@@ -631,7 +651,7 @@ export default function HomePage() {
           })}
         </section>
 
-        <ArchivePanel leads={leads.filter((lead) => lead.archived && (!onlyMyLeads || lead.managerId === (currentManager?.code || FALLBACK_MANAGER_ID)))} lookups={{ managerForConfig, stageForConfig }} onRestore={restoreLead} />
+        <ArchivePanel leads={leads.filter((lead) => lead.archived && (!onlyMyLeads || lead.managerId === (currentManager?.code || FALLBACK_MANAGER_ID)))} lookups={{ managerForConfig, stageForConfig, statusForConfig }} onRestore={restoreLead} />
       </section>
 
       {selectedLead && draft && (
@@ -641,9 +661,9 @@ export default function HomePage() {
           requiresFollowUp={modalSource === "inbox" && selectedLead.unread}
           requiresMetaLink={modalSource === "inbox" && selectedLead.unread && !selectedLead.metaUrlVerified}
           warning={warning}
-          config={{ managers: activeManagers, stages: activeStages, products: activeProducts }}
+          config={{ managers: activeManagers, stages: activeStages, products: activeProducts, statuses: activeStatuses, religions: activeReligions }}
           isAdmin={currentManager?.role === "admin"}
-          lookups={{ managerForConfig, stageForConfig, productForConfig }}
+          lookups={{ managerForConfig, stageForConfig, productForConfig, statusForConfig }}
           onChange={setDraft}
           onClose={closeModal}
           onArchive={archiveSelectedLead}
@@ -656,6 +676,7 @@ export default function HomePage() {
           draft={manualLead}
           error={manualError}
           managers={activeManagers}
+          religions={activeReligions}
           onChange={setManualLead}
           onClose={() => { setManualLeadOpen(false); setManualError(""); }}
           onSubmit={createManualLead}
@@ -696,11 +717,11 @@ function LeadCard({ lead, lookups, onOpen, onDragStart }) {
 }
 
 function EventCard({ lead, lookups, onOpen, onDragStart }) {
-  const { managerForConfig, stageForConfig, productForConfig } = lookups;
+  const { managerForConfig, stageForConfig, productForConfig, statusForConfig } = lookups;
   return (
     <article className={`event-card ${lead.platform} ${lead.priority === "high" ? "priority-high" : ""}`} draggable onDragStart={onDragStart}>
       <strong>{lead.name}</strong>
-      <span>{platformLabel(lead.platform)} - {statusLabel(lead.status)}</span>
+      <span>{platformLabel(lead.platform)} - {statusForConfig(lead.status).name}</span>
       {lead.unread && <div className="event-badges"><span className="status-pill unread-pill">Mesaj nou</span></div>}
       <div className="manager-line">
         <span className="manager-dot" style={{ "--manager-color": managerForConfig(lead.managerId).color }} />
@@ -727,7 +748,7 @@ function Avatar({ lead, className = "" }) {
   return <img className={className || "avatar"} src={avatarSrc(lead.avatar)} alt="" onError={() => setFailed(true)} />;
 }
 
-function ManualLeadModal({ draft, error, managers, onChange, onClose, onSubmit }) {
+function ManualLeadModal({ draft, error, managers, religions, onChange, onClose, onSubmit }) {
   function update(field, value) {
     onChange({ ...draft, [field]: value });
   }
@@ -756,7 +777,7 @@ function ManualLeadModal({ draft, error, managers, onChange, onClose, onSubmit }
 
           <div className="field-grid">
             <label>Telefon<input value={draft.phone} onChange={(event) => update("phone", event.target.value)} placeholder="+373..." /></label>
-            <label>Tags<input value={draft.tags} onChange={(event) => update("tags", event.target.value)} placeholder="ex: cald, pret" /></label>
+            <label>Religie<select value={draft.tags} onChange={(event) => update("tags", event.target.value)}><option value="">Neindicat</option>{religions.map((religion) => <option key={religion.id} value={religion.name}>{religion.name}</option>)}</select></label>
           </div>
 
           <label>Comentarii<textarea value={draft.notes} onChange={(event) => update("notes", event.target.value)} rows={4} placeholder="Note interne despre client" /></label>
@@ -782,6 +803,18 @@ function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning,
     if (selected.has(productId)) selected.delete(productId);
     else selected.add(productId);
     update("products", Array.from(selected));
+  }
+
+  function toggleReligion(religionName) {
+    const selected = new Set(
+      draft.tags
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean)
+    );
+    if (selected.has(religionName)) selected.delete(religionName);
+    else selected.add(religionName);
+    update("tags", Array.from(selected).join(", "));
   }
 
   function saveMetaLinkOnly() {
@@ -824,7 +857,7 @@ function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning,
             <>
 
           <div className="field-grid">
-            <label>Status<select value={draft.status} onChange={(event) => update("status", event.target.value)}>{["new", "scheduled", "contacted", "closed"].map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}</select></label>
+            <label>Status<select value={draft.status} onChange={(event) => update("status", event.target.value)}>{config.statuses.map((status) => <option key={status.id} value={status.id}>{status.name}</option>)}</select></label>
             <label>Manager responsabil<select value={draft.managerId} onChange={(event) => update("managerId", event.target.value)}><option value="unassigned">Neatribuit</option>{config.managers.map((manager) => <option key={manager.code} value={manager.code}>{manager.name}</option>)}</select></label>
           </div>
 
@@ -834,7 +867,18 @@ function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning,
           </div>
 
           <label>Etapa / tag principal<select value={draft.stage} onChange={(event) => update("stage", event.target.value)}>{config.stages.map((stage) => <option key={stage.id} value={stage.id}>{stage.name}</option>)}</select></label>
-          <label>Tags extra<input value={draft.tags} onChange={(event) => update("tags", event.target.value)} placeholder="ex: cald, mobila, pret" /></label>
+
+          <div className="modal-section">
+            <p className="eyebrow">Religie</p>
+            <div className="product-grid">
+              {config.religions.map((religion) => (
+                <label key={religion.id} className="product-option">
+                  <input type="checkbox" checked={draft.tags.split(",").map((tag) => tag.trim()).includes(religion.name)} onChange={() => toggleReligion(religion.name)} />
+                  <span>{religion.name}</span>
+                </label>
+              ))}
+            </div>
+          </div>
 
           <div className="modal-section">
             <p className="eyebrow">Produse propuse</p>
@@ -993,7 +1037,7 @@ function StatsTable({ title, columns, rows }) {
 }
 
 function ArchivePanel({ leads, lookups, onRestore }) {
-  const { managerForConfig, stageForConfig } = lookups;
+  const { managerForConfig, stageForConfig, statusForConfig } = lookups;
   return (
     <section className="archive-panel" aria-label="Clienti arhivati">
       <div className="archive-head">
@@ -1002,7 +1046,7 @@ function ArchivePanel({ leads, lookups, onRestore }) {
       </div>
       <div className="archive-table-wrap">
         <table className="archive-table">
-          <thead><tr><th>Client</th><th>Platforma</th><th>Manager</th><th>Tags</th><th>Status</th><th>Actiuni</th></tr></thead>
+          <thead><tr><th>Client</th><th>Platforma</th><th>Manager</th><th>Religie</th><th>Status</th><th>Actiuni</th></tr></thead>
           <tbody>
             {leads.map((lead) => (
               <tr key={lead.id}>
@@ -1010,7 +1054,7 @@ function ArchivePanel({ leads, lookups, onRestore }) {
                 <td><span className={`platform-pill platform-${lead.platform}`}>{platformLabel(lead.platform)}</span></td>
                 <td>{managerForConfig(lead.managerId).name}</td>
                 <td><div className="tag-row"><span className="tag-pill">{stageForConfig(lead.stage).name}</span>{lead.tags?.map((tag) => <span key={tag} className="tag-pill">{tag}</span>)}</div></td>
-                <td>{statusLabel(lead.status)}</td>
+                <td>{statusForConfig(lead.status).name}</td>
                 <td><button className="mini-btn primary" onClick={() => onRestore(lead.id)}>Reactiveaza</button></td>
               </tr>
             ))}
