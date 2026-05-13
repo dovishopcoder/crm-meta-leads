@@ -60,34 +60,54 @@ export default function AdminPage() {
 
   async function handleCreateStage(event) {
     event.preventDefault();
-    await submitAdminAction(() => createStage(stageForm), "Etapa adaugata.");
+    await submitAdminAction(async () => {
+      const stage = await createStage(stageForm);
+      addSettingRow("stages", stage);
+    }, "Etapa adaugata.", { refresh: false });
     setStageForm({ code: "", name: "", position: "" });
   }
 
   async function handleCreateProduct(event) {
     event.preventDefault();
-    await submitAdminAction(() => createProduct(productForm), "Produs adaugat.");
+    await submitAdminAction(async () => {
+      const product = await createProduct(productForm);
+      addSettingRow("products", product);
+    }, "Produs adaugat.", { refresh: false });
     setProductForm({ code: "", name: "" });
   }
 
   async function handleCreateStatus(event) {
     event.preventDefault();
-    await submitAdminAction(() => createLeadStatus(statusForm), "Status adaugat.");
+    await submitAdminAction(async () => {
+      const status = await createLeadStatus(statusForm);
+      addSettingRow("statuses", status);
+    }, "Status adaugat.", { refresh: false });
     setStatusForm({ code: "", name: "", position: "" });
   }
 
   async function handleCreateReligion(event) {
     event.preventDefault();
-    await submitAdminAction(() => createReligion(religionForm), "Religie adaugata.");
+    await submitAdminAction(async () => {
+      const religion = await createReligion(religionForm);
+      addSettingRow("religions", religion);
+    }, "Religie adaugata.", { refresh: false });
     setReligionForm({ code: "", name: "", position: "" });
   }
 
-  async function submitAdminAction(action, successMessage) {
+  function addSettingRow(key, row) {
+    if (!row?.id) return;
+    setAdminData((current) => ({
+      ...current,
+      [key]: [...(current[key] || []).filter((item) => item.id !== row.id), row]
+    }));
+  }
+
+  async function submitAdminAction(action, successMessage, options = {}) {
     setError("");
     setMessage("");
     try {
       await action();
-      await refreshAdminData();
+      if (options.refresh !== false) await refreshAdminData();
       setMessage(successMessage);
     } catch (err) {
       setError(err.message || "Nu s-a putut salva.");

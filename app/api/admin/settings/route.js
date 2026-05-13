@@ -36,9 +36,9 @@ export async function POST(request) {
       return NextResponse.json({ error: "Completeaza codul si numele." }, { status: 400 });
     }
 
-    const { error } = await supabase.from(table).insert(payload);
+    const { data, error } = await supabase.from(table).insert(payload).select("*").single();
     if (error) throw error;
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, data });
   } catch (error) {
     return NextResponse.json({ error: error.message || "Nu s-a putut salva setarea." }, { status: 500 });
   }
@@ -59,9 +59,9 @@ export async function PATCH(request) {
       return NextResponse.json({ error: "Completeaza codul si numele." }, { status: 400 });
     }
 
-    const { error } = await supabase.from(table).update(payload).eq("id", id);
+    const { data, error } = await supabase.from(table).update(payload).eq("id", id).select("*").single();
     if (error) throw error;
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, data });
   } catch (error) {
     return NextResponse.json({ error: error.message || "Nu s-a putut actualiza setarea." }, { status: 500 });
   }

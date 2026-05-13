@@ -222,19 +222,19 @@ export async function resetManagerPassword(managerId, password) {
 }
 
 export async function createStage({ code, name, position }) {
-  await saveAdminSetting("POST", { type: "stage", code, name, position, active: true });
+  return saveAdminSetting("POST", { type: "stage", code, name, position, active: true });
 }
 
 export async function createProduct({ code, name }) {
-  await saveAdminSetting("POST", { type: "product", code, name, active: true });
+  return saveAdminSetting("POST", { type: "product", code, name, active: true });
 }
 
 export async function createLeadStatus({ code, name, position }) {
-  await saveAdminSetting("POST", { type: "status", code, name, position, active: true });
+  return saveAdminSetting("POST", { type: "status", code, name, position, active: true });
 }
 
 export async function createReligion({ code, name, position }) {
-  await saveAdminSetting("POST", { type: "religion", code, name, position, active: true });
+  return saveAdminSetting("POST", { type: "religion", code, name, position, active: true });
 }
 
 export async function updateManager(id, { name, email, role, color, active }) {
@@ -267,19 +267,19 @@ export async function transferActiveLeads(fromManagerId, toManagerId) {
 }
 
 export async function updateStage(id, { code, name, position, active }) {
-  await saveAdminSetting("PATCH", { id, type: "stage", code, name, position, active });
+  return saveAdminSetting("PATCH", { id, type: "stage", code, name, position, active });
 }
 
 export async function updateProduct(id, { code, name, active }) {
-  await saveAdminSetting("PATCH", { id, type: "product", code, name, active });
+  return saveAdminSetting("PATCH", { id, type: "product", code, name, active });
 }
 
 export async function updateLeadStatus(id, { code, name, position, active }) {
-  await saveAdminSetting("PATCH", { id, type: "status", code, name, position, active });
+  return saveAdminSetting("PATCH", { id, type: "status", code, name, position, active });
 }
 
 export async function updateReligion(id, { code, name, position, active }) {
-  await saveAdminSetting("PATCH", { id, type: "religion", code, name, position, active });
+  return saveAdminSetting("PATCH", { id, type: "religion", code, name, position, active });
 }
 
 async function saveAdminSetting(method, body) {
@@ -301,6 +301,7 @@ async function saveAdminSetting(method, body) {
 
   const payload = await response.json();
   if (!response.ok) throw new Error(payload.error || "Nu s-a putut salva setarea.");
+  return payload.data;
 }
 
 export async function loadSupabaseLeads() {
