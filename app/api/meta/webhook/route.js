@@ -264,13 +264,17 @@ async function upsertLeadFromMessage(supabase, message) {
   const now = new Date().toISOString();
   const { data: existing, error: existingError } = await supabase
     .from("leads")
-    .select("id, name, platform, meta_email, meta_url, meta_url_verified")
+    .select("id, name, platform, meta_email, meta_url, meta_url_verified, archived_at")
     .eq("meta_contact_id", message.metaContactId)
     .maybeSingle();
 
   if (existingError) throw existingError;
 
   if (existing) {
+    const wasArchived = Boolean(existing.archived_at);
+    const { data: reactivatedStage } = wasArchived
+      ? await supabase.from("stages").select("id").eq("code", "reactivated").maybeSingle()
+      : { data: null };
     const { data, error } = await supabase
       .from("leads")
       .update({
@@ -278,7 +282,10 @@ async function upsertLeadFromMessage(supabase, message) {
         avatar_url: message.avatarUrl,
         meta_url: chooseMetaUrl(existing.meta_url, existing.meta_url_verified, message.metaUrl, message.metaContactId),
         meta_email: message.email || existing.meta_email || null,
+        status: wasArchived ? "reactivated" : undefined,
         unread: true,
+        archived_at: wasArchived ? null : undefined,
+        stage_id: wasArchived && reactivatedStage?.id ? reactivatedStage.id : undefined,
         last_message_at: message.messageAt || now,
         updated_at: now
       })
@@ -287,7 +294,7 @@ async function upsertLeadFromMessage(supabase, message) {
       .single();
 
     if (error) throw error;
-    await insertActivity(supabase, existing.id, "incoming_message", {
+    await insertActivity(supabase, existing.id, wasArchived ? "reactivated_by_message" : "incoming_message", {
       source: "meta_webhook",
       metaUrlSource: message.metaUrlSource || null,
       metaConversationId: message.metaConversationId || null

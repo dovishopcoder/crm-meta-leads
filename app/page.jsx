@@ -21,6 +21,7 @@ const stages = [
   { id: "followup", name: "Follow-up" },
   { id: "accepted", name: "Acceptat" },
   { id: "no-response", name: "Nu raspunde" },
+  { id: "reactivated", name: "Reactivat" },
   { id: "closed", name: "Inchis" }
 ];
 
@@ -34,6 +35,7 @@ const products = [
 const leadStatuses = [
   { id: "new", name: "Nou" },
   { id: "scheduled", name: "Programat" },
+  { id: "reactivated", name: "Reactivat" },
   { id: "contacted", name: "Contactat" },
   { id: "closed", name: "Inchis" }
 ];
@@ -539,9 +541,9 @@ export default function HomePage() {
     updateLead(id, (lead) => ({
       ...lead,
       archived: false,
-      status: "new",
+      status: "reactivated",
       unread: true,
-      stage: "new",
+      stage: "reactivated",
       activity: [...(lead.activity || []), { type: "restored", at: toIso(new Date()), managerId: lead.managerId }]
     }));
   }
@@ -972,6 +974,7 @@ function activityTitle(type) {
   return {
     processed: "Client prelucrat",
     incoming_message: "Mesaj nou primit",
+    reactivated_by_message: "Client reactivat prin mesaj nou",
     manual_created: "Lead creat manual",
     archived: "Client arhivat",
     restored: "Client reactivat"
@@ -1182,7 +1185,7 @@ function normalizeMetaUrl(value) {
 }
 
 function statusLabel(status) {
-  return { new: "Nou", scheduled: "Programat", contacted: "Contactat", closed: "Inchis" }[status] || "Nou";
+  return { new: "Nou", scheduled: "Programat", reactivated: "Reactivat", contacted: "Contactat", closed: "Inchis" }[status] || "Nou";
 }
 
 function toDateKey(date) {

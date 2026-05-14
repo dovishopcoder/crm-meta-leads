@@ -14,6 +14,7 @@ export const stages = [
   { id: "followup", name: "Follow-up" },
   { id: "accepted", name: "Acceptat" },
   { id: "no-response", name: "Nu raspunde" },
+  { id: "reactivated", name: "Reactivat" },
   { id: "closed", name: "Inchis" }
 ];
 
@@ -27,6 +28,7 @@ export const products = [
 export const leadStatuses = [
   { id: "new", name: "Nou" },
   { id: "scheduled", name: "Programat" },
+  { id: "reactivated", name: "Reactivat" },
   { id: "contacted", name: "Contactat" },
   { id: "closed", name: "Inchis" }
 ];
