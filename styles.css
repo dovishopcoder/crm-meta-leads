@@ -891,6 +891,10 @@ label textarea {
   text-align: center;
 }
 
+.muted-cell {
+  color: var(--muted);
+}
+
 @media (max-width: 900px) {
   h1 {
     font-size: 23px;

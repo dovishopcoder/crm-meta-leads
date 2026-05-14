@@ -292,6 +292,10 @@ export default function HomePage() {
     return (crmConfig.statuses || leadStatuses).find((status) => status.id === id) || { id, name: id || "Nou" };
   }
 
+  function religionLabelForConfig(tag) {
+    return activeReligions.find((religion) => religion.id === tag || religion.name.toLowerCase() === String(tag).toLowerCase())?.name || tag;
+  }
+
   function updateLead(id, updater) {
     setLeads((current) => {
       let updatedLead = null;
@@ -670,7 +674,7 @@ export default function HomePage() {
           })}
         </section>
 
-        <ArchivePanel leads={leads.filter((lead) => lead.archived && (!onlyMyLeads || lead.managerId === (currentManager?.code || FALLBACK_MANAGER_ID)))} lookups={{ managerForConfig, stageForConfig, statusForConfig }} onRestore={restoreLead} />
+        <ArchivePanel leads={leads.filter((lead) => lead.archived && (!onlyMyLeads || lead.managerId === (currentManager?.code || FALLBACK_MANAGER_ID)))} lookups={{ managerForConfig, stageForConfig, statusForConfig, religionLabelForConfig }} onRestore={restoreLead} />
       </section>
 
       {selectedLead && draft && (
@@ -1020,7 +1024,7 @@ function StatsTable({ title, columns, rows }) {
 }
 
 function ArchivePanel({ leads, lookups, onRestore }) {
-  const { managerForConfig, stageForConfig, statusForConfig } = lookups;
+  const { managerForConfig, statusForConfig, religionLabelForConfig } = lookups;
   return (
     <section className="archive-panel" aria-label="Clienti arhivati">
       <div className="archive-head">
@@ -1036,7 +1040,13 @@ function ArchivePanel({ leads, lookups, onRestore }) {
                 <td><div className="archive-client"><Avatar lead={lead} /><span>{lead.name}</span></div></td>
                 <td><span className={`platform-pill platform-${lead.platform}`}>{platformLabel(lead.platform)}</span></td>
                 <td>{managerForConfig(lead.managerId).name}</td>
-                <td><div className="tag-row"><span className="tag-pill">{stageForConfig(lead.stage).name}</span>{lead.tags?.map((tag) => <span key={tag} className="tag-pill">{tag}</span>)}</div></td>
+                <td>
+                  {lead.tags?.length ? (
+                    <div className="tag-row">{lead.tags.map((tag) => <span key={tag} className="tag-pill">{religionLabelForConfig(tag)}</span>)}</div>
+                  ) : (
+                    <span className="muted-cell">Neindicat</span>
+                  )}
+                </td>
                 <td>{statusForConfig(lead.status).name}</td>
                 <td><button className="mini-btn primary" onClick={() => onRestore(lead.id)}>Reactiveaza</button></td>
               </tr>
