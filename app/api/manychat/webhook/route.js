@@ -64,7 +64,7 @@ async function upsertManyChatLead(supabase, message) {
       .update(removeUndefined({
         meta_contact_id: message.metaContactId || undefined,
         name: message.name || existing.name,
-        avatar_url: message.avatarUrl || undefined,
+        avatar_url: chooseAvatarUrl(existing.avatar_url, message.avatarUrl),
         meta_url: chooseUrl(existing.meta_url, existing.meta_url_verified, message.metaUrl),
         customer_email: message.email || undefined,
         phone: message.phone || undefined,
@@ -124,7 +124,7 @@ async function findExistingLead(supabase, message) {
   if (idVariants.length) {
     const { data, error } = await supabase
       .from("leads")
-      .select("id, name, meta_contact_id, meta_email, meta_url, meta_url_verified, archived_at")
+      .select("id, name, avatar_url, meta_contact_id, meta_email, meta_url, meta_url_verified, archived_at")
       .in("meta_contact_id", idVariants)
       .order("created_at", { ascending: true })
       .limit(1);
@@ -136,7 +136,7 @@ async function findExistingLead(supabase, message) {
   if (message.email) {
     const { data, error } = await supabase
       .from("leads")
-      .select("id, name, meta_contact_id, meta_email, meta_url, meta_url_verified, archived_at")
+      .select("id, name, avatar_url, meta_contact_id, meta_email, meta_url, meta_url_verified, archived_at")
       .or(`customer_email.eq.${message.email},email.eq.${message.email},meta_email.eq.${message.email}`)
       .order("created_at", { ascending: true })
       .limit(1);
@@ -148,7 +148,7 @@ async function findExistingLead(supabase, message) {
   if (message.phone) {
     const { data, error } = await supabase
       .from("leads")
-      .select("id, name, meta_contact_id, meta_email, meta_url, meta_url_verified, archived_at")
+      .select("id, name, avatar_url, meta_contact_id, meta_email, meta_url, meta_url_verified, archived_at")
       .eq("phone", message.phone)
       .order("created_at", { ascending: true })
       .limit(1);
@@ -160,7 +160,7 @@ async function findExistingLead(supabase, message) {
   if (message.name) {
     const { data, error } = await supabase
       .from("leads")
-      .select("id, name, meta_contact_id, meta_email, meta_url, meta_url_verified, archived_at")
+      .select("id, name, avatar_url, meta_contact_id, meta_email, meta_url, meta_url_verified, archived_at")
       .eq("platform", message.platform)
       .ilike("name", message.name)
       .order("created_at", { ascending: true })
@@ -199,6 +199,22 @@ function normalizePlatform(platform) {
 function chooseUrl(existingUrl, existingVerified, incomingUrl) {
   if (existingVerified && existingUrl) return existingUrl;
   return incomingUrl || existingUrl || "";
+}
+
+function chooseAvatarUrl(existingUrl, incomingUrl) {
+  if (!isUsableAvatarUrl(incomingUrl)) return existingUrl || undefined;
+  if (!existingUrl || !isUsableAvatarUrl(existingUrl)) return incomingUrl;
+  return existingUrl;
+}
+
+function isUsableAvatarUrl(value) {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !["example.com", "localhost"].includes(url.hostname);
+  } catch {
+    return false;
+  }
 }
 
 function removeUndefined(object) {
