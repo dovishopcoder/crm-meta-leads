@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AppNav } from "./components";
 import { getCurrentSession, loadCrmConfig, loadCurrentManager, loadSupabaseLeads, saveSupabaseLead, signOut, supabase } from "./supabase-crm";
 
@@ -206,6 +206,7 @@ export default function HomePage() {
   const [view, setView] = useState("week");
   const [cursorDate, setCursorDate] = useState(startOfDay(new Date()));
   const [mobileView, setMobileView] = useState("inbox");
+  const calendarGridRef = useRef(null);
 
   useEffect(() => {
     async function loadLeads() {
@@ -326,6 +327,13 @@ export default function HomePage() {
 
   function religionLabelForConfig(tag) {
     return activeReligions.find((religion) => religion.id === tag || religion.name.toLowerCase() === String(tag).toLowerCase())?.name || tag;
+  }
+
+  function goToToday() {
+    setCursorDate(startOfDay(new Date()));
+    window.requestAnimationFrame(() => {
+      calendarGridRef.current?.scrollTo({ left: 0, behavior: "smooth" });
+    });
   }
 
   function updateLead(id, updater) {
@@ -650,7 +658,7 @@ export default function HomePage() {
 
           <div className="toolbar-actions">
             <button className="icon-btn" onClick={() => setCursorDate(addDays(cursorDate, view === "day" ? -1 : view === "week" ? -7 : -30))} aria-label="Perioada precedenta">&lt;</button>
-            <button className="today-btn" onClick={() => setCursorDate(startOfDay(new Date()))}>Azi</button>
+            <button className="today-btn" onClick={goToToday}>Azi</button>
             <button className="icon-btn" onClick={() => setCursorDate(addDays(cursorDate, view === "day" ? 1 : view === "week" ? 7 : 30))} aria-label="Perioada urmatoare">&gt;</button>
             <div className="segmented" role="tablist" aria-label="Unitate calendar">
               {["day", "week", "month"].map((item) => (
@@ -667,7 +675,7 @@ export default function HomePage() {
           <span>Trage un lead peste o zi sau deschide detaliile pentru salvare.</span>
         </div>
 
-        <section className="calendar-grid" style={{ "--columns": visibleDates.length }} aria-label="Calendar follow-up">
+        <section ref={calendarGridRef} className="calendar-grid" style={{ "--columns": visibleDates.length }} aria-label="Calendar follow-up">
           {visibleDates.map((date) => {
             const key = toDateKey(date);
             const events = leads.filter((lead) => {
