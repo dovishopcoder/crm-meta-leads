@@ -54,6 +54,7 @@ export function StatsPanel({ stats }) {
           <p className="eyebrow">Statistica</p>
           <h2>Performanta manageri si etape</h2>
         </div>
+        <Link className="mini-btn primary" href="/archive">Clienti inactivi</Link>
       </div>
       <div className="stats-cards">
         {stats.cards.map((card) => <article key={card.label} className="stat-card"><span>{card.label}</span><strong>{card.value}</strong></article>)}

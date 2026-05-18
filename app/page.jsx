@@ -699,8 +699,6 @@ export default function HomePage() {
             );
           })}
         </section>
-
-        <ArchivePanel leads={leads.filter((lead) => lead.archived && (!onlyMyLeads || lead.managerId === (currentManager?.code || FALLBACK_MANAGER_ID)))} lookups={{ managerForConfig, stageForConfig, statusForConfig, religionLabelForConfig }} onRestore={restoreLead} />
       </section>
 
       {selectedLead && draft && (
