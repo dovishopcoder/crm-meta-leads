@@ -65,7 +65,7 @@ async function upsertManyChatLead(supabase, message) {
         meta_contact_id: message.metaContactId || undefined,
         name: message.name || existing.name,
         avatar_url: chooseAvatarUrl(existing.avatar_url, message.avatarUrl),
-        meta_url: chooseUrl(existing.meta_url, existing.meta_url_verified, message.metaUrl),
+        meta_url: existing.meta_url || undefined,
         customer_email: message.email || undefined,
         phone: message.phone || undefined,
         status: wasArchived ? "reactivated" : undefined,
@@ -95,8 +95,8 @@ async function upsertManyChatLead(supabase, message) {
       platform: message.platform,
       name: message.name,
       avatar_url: message.avatarUrl || "",
-      meta_url: message.metaUrl || "",
-      meta_url_verified: Boolean(message.metaUrl),
+      meta_url: "",
+      meta_url_verified: false,
       customer_email: message.email || null,
       phone: message.phone || null,
       status: "new",
@@ -194,11 +194,6 @@ function normalizeDate(value) {
 
 function normalizePlatform(platform) {
   return String(platform).toLowerCase().includes("instagram") ? "instagram" : "facebook";
-}
-
-function chooseUrl(existingUrl, existingVerified, incomingUrl) {
-  if (existingVerified && existingUrl) return existingUrl;
-  return incomingUrl || existingUrl || "";
 }
 
 function chooseAvatarUrl(existingUrl, incomingUrl) {
