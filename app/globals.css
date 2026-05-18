@@ -758,7 +758,8 @@
   }
 
   .nav-health-text {
-    display: none;
+    padding-left: 6px;
+    font-size: 12px;
   }
 
   .nav-brand {

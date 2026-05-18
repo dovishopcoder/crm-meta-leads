@@ -13,7 +13,7 @@ export function AppNav({ active, manager, systemStatus = "ok" }) {
   }
 
   const userLabel = `${manager?.name} - ${manager?.role === "admin" ? "Admin" : "Manager"}`;
-  const statusLabel = systemStatus === "error" ? "Eroare" : "Totul functioneaza";
+  const statusLabel = systemStatus === "error" ? "Eroare" : "Conectat";
 
   return (
     <nav className="app-nav" aria-label="Navigare aplicatie">
@@ -42,7 +42,7 @@ export function AppNav({ active, manager, systemStatus = "ok" }) {
           <span className={`nav-user nav-user-status ${systemStatus === "error" ? "error" : "ok"}`}>
             <span className="status-dot" aria-hidden="true" />
             <span>{userLabel}</span>
-            {manager.role !== "admin" && <span className="nav-health-text">{statusLabel}</span>}
+            <span className="nav-health-text">{statusLabel}</span>
           </span>
         )}
         <span className="nav-brand" aria-label="NextTouch CRM">
