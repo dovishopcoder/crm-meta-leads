@@ -6,6 +6,7 @@ import { getCurrentSession, loadCrmConfig, loadCurrentManager, loadSupabaseLeads
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const FALLBACK_MANAGER_ID = "diana";
+const PENDING_INBOX_LEAD_KEY = "crm-pending-inbox-lead";
 
 const managers = [
   { id: "unassigned", name: "Neatribuit", color: "#8a97aa" },
@@ -278,6 +279,35 @@ export default function HomePage() {
   const activeReligions = (crmConfig.religions || religions).filter((religion) => religion.active);
   const activeHooks = (crmConfig.hooks || hooks).filter((hook) => hook.active);
 
+  useEffect(() => {
+    if (!loaded || selectedId) return;
+    const pendingId = window.localStorage.getItem(PENDING_INBOX_LEAD_KEY);
+    if (!pendingId) return;
+
+    const pendingLead = leads.find((lead) => lead.id === pendingId);
+    if (pendingLead?.unread && !pendingLead.archived) {
+      setSelectedId(pendingLead.id);
+      setModalSource("inbox");
+      setDraft(makeLeadDraft(pendingLead));
+      setWarning("Acest lead a ramas deschis in Necitite. Finalizeaza pasii obligatorii inainte de a continua.");
+      setMobileView("inbox");
+    } else {
+      window.localStorage.removeItem(PENDING_INBOX_LEAD_KEY);
+    }
+  }, [leads, loaded, selectedId]);
+
+  useEffect(() => {
+    if (!selectedLead || modalSource !== "inbox" || !selectedLead.unread) return;
+
+    const warnBeforeRefresh = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", warnBeforeRefresh);
+    return () => window.removeEventListener("beforeunload", warnBeforeRefresh);
+  }, [modalSource, selectedLead]);
+
   function managerForConfig(id) {
     return crmConfig.managers.find((manager) => manager.code === id) || managerFor(id);
   }
@@ -411,21 +441,10 @@ export default function HomePage() {
     setSelectedId(lead.id);
     setModalSource(source);
     setWarning("");
-    setDraft({
-      status: lead.status,
-      managerId: lead.managerId || "unassigned",
-      priority: lead.priority || "normal",
-      followDate: lead.followDate || "",
-      stage: lead.stage || "new",
-      tags: (lead.tags || []).join(", "),
-      hook: lead.hook || "",
-      metaUrl: lead.metaUrlVerified ? lead.metaUrl || "" : "",
-      metaUrlVerified: Boolean(lead.metaUrlVerified),
-      customerEmail: lead.customerEmail || "",
-      phone: lead.phone || "",
-      notes: lead.notes || "",
-      products: (lead.products || []).map((item) => item.id)
-    });
+    setDraft(makeLeadDraft(lead));
+    if (source === "inbox" && lead.unread) {
+      window.localStorage.setItem(PENDING_INBOX_LEAD_KEY, lead.id);
+    }
   }
 
   function closeModal() {
@@ -439,6 +458,7 @@ export default function HomePage() {
       saveSelectedLead();
       return;
     }
+    window.localStorage.removeItem(PENDING_INBOX_LEAD_KEY);
     setSelectedId(null);
     setDraft(null);
   }
@@ -506,6 +526,7 @@ export default function HomePage() {
     });
 
     if (!options.keepOpen) {
+      window.localStorage.removeItem(PENDING_INBOX_LEAD_KEY);
       setSelectedId(null);
       setDraft(null);
     }
@@ -533,6 +554,7 @@ export default function HomePage() {
       followDate: "",
       activity: [...(lead.activity || []), { type: "archived", at: toIso(new Date()), managerId: lead.managerId }]
     }));
+    window.localStorage.removeItem(PENDING_INBOX_LEAD_KEY);
     setSelectedId(null);
     setDraft(null);
   }
@@ -1123,6 +1145,24 @@ function makeEmptyManualLead() {
     hook: "",
     tags: "",
     notes: ""
+  };
+}
+
+function makeLeadDraft(lead) {
+  return {
+    status: lead.status,
+    managerId: lead.managerId || "unassigned",
+    priority: lead.priority || "normal",
+    followDate: lead.followDate || "",
+    stage: lead.stage || "new",
+    tags: (lead.tags || []).join(", "),
+    hook: lead.hook || "",
+    metaUrl: lead.metaUrlVerified ? lead.metaUrl || "" : "",
+    metaUrlVerified: Boolean(lead.metaUrlVerified),
+    customerEmail: lead.customerEmail || "",
+    phone: lead.phone || "",
+    notes: lead.notes || "",
+    products: (lead.products || []).map((item) => item.id)
   };
 }
 
