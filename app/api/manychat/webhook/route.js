@@ -63,7 +63,7 @@ async function upsertManyChatLead(supabase, message) {
       .from("leads")
       .update(removeUndefined({
         meta_contact_id: message.metaContactId || undefined,
-        name: message.name || existing.name,
+        name: chooseName(existing.name, message.name),
         avatar_url: chooseAvatarUrl(existing.avatar_url, message.avatarUrl),
         meta_url: existing.meta_url || undefined,
         customer_email: message.email || undefined,
@@ -200,6 +200,16 @@ function chooseAvatarUrl(existingUrl, incomingUrl) {
   if (!isUsableAvatarUrl(incomingUrl)) return existingUrl || undefined;
   if (!existingUrl || !isUsableAvatarUrl(existingUrl)) return incomingUrl;
   return existingUrl;
+}
+
+function chooseName(existingName, incomingName) {
+  if (!incomingName || isBrokenPlaceholder(incomingName)) return existingName || "Client ManyChat";
+  return incomingName;
+}
+
+function isBrokenPlaceholder(value) {
+  const compact = String(value || "").replace(/\s/g, "");
+  return compact.length > 0 && /^[?]+$/.test(compact);
 }
 
 function isUsableAvatarUrl(value) {
