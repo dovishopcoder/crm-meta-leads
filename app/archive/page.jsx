@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { AppNav } from "../components";
 import { managers, products, stages, leadStatuses, religions, hooks } from "../crm-data";
 import { getCurrentSession, loadCrmConfig, loadCurrentManager, loadSupabaseLeads, saveSupabaseLead, signOut, supabase } from "../supabase-crm";
@@ -127,7 +128,10 @@ function ArchivePanel({ leads, lookups, onRestore }) {
           <p className="eyebrow">Arhiva</p>
           <h2>Clienti inactivi</h2>
         </div>
-        <span className="count-badge archive-count">{leads.length}</span>
+        <div className="panel-head-actions">
+          <Link className="mini-btn" href="/stats">Inapoi la statistici</Link>
+          <span className="count-badge archive-count">{leads.length}</span>
+        </div>
       </div>
       <div className="archive-table-wrap">
         <table className="archive-table">
