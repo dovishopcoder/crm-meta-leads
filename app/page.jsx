@@ -646,7 +646,7 @@ export default function HomePage() {
 
       <section className={`calendar-panel ${mobileView !== "calendar" ? "mobile-hidden" : ""}`}>
         <div className={`connection-banner ${dataSource === "supabase" ? "online" : "offline"}`}>
-          <span>{dataSource === "supabase" ? "Conectat la Supabase" : dataSource === "error" ? "Eroare Supabase" : "Mod local"}</span>
+          <span>{connectionLabel(dataSource, currentManager)}</span>
           <span>{loadError || (saveState === "saving" ? "Se salveaza..." : saveState === "saved" ? "Salvat" : saveState === "error" ? `Eroare: ${saveError || "salvare esuata"}` : "Gata")}</span>
         </div>
 
@@ -1234,6 +1234,12 @@ function normalizeMetaUrl(value) {
 
 function statusLabel(status) {
   return { new: "Nou", scheduled: "Programat", reactivated: "Reactivat", contacted: "Contactat", closed: "Inchis" }[status] || "Nou";
+}
+
+function connectionLabel(dataSource, manager) {
+  if (dataSource === "error") return "Eroare de conectare";
+  if (dataSource !== "supabase") return "Mod local";
+  return manager?.role === "admin" ? "Conectat la Supabase" : "Totul functioneaza";
 }
 
 function toDateKey(date) {

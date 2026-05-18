@@ -60,10 +60,16 @@ export default function StatsPage() {
     <main className="stats-page-shell">
       <AppNav active="stats" manager={currentManager} />
       <div className={`connection-banner ${dataSource === "supabase" ? "online" : "offline"}`}>
-        <span>{dataSource === "supabase" ? "Conectat la Supabase" : dataSource === "error" ? "Eroare Supabase" : "Mod local"}</span>
+        <span>{connectionLabel(dataSource, currentManager)}</span>
         <span>{loadError || "Statistici actualizate"}</span>
       </div>
       <StatsPanel stats={stats} />
     </main>
   );
+}
+
+function connectionLabel(dataSource, manager) {
+  if (dataSource === "error") return "Eroare de conectare";
+  if (dataSource !== "supabase") return "Mod local";
+  return manager?.role === "admin" ? "Conectat la Supabase" : "Totul functioneaza";
 }

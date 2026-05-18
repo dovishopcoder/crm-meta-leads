@@ -103,7 +103,7 @@ export default function ArchivePage() {
     <main className="stats-page-shell">
       <AppNav active="stats" manager={currentManager} />
       <div className={`connection-banner ${dataSource === "supabase" ? "online" : "offline"}`}>
-        <span>{dataSource === "supabase" ? "Conectat la Supabase" : dataSource === "error" ? "Eroare Supabase" : "Mod local"}</span>
+        <span>{connectionLabel(dataSource, currentManager)}</span>
         <span>{loadError || (saveState === "saving" ? "Se salveaza..." : saveState === "saved" ? "Salvat" : "Clienti inactivi")}</span>
       </div>
 
@@ -178,4 +178,10 @@ function avatarSrc(src) {
 
 function platformLabel(platform) {
   return platform === "facebook" ? "Facebook" : "Instagram";
+}
+
+function connectionLabel(dataSource, manager) {
+  if (dataSource === "error") return "Eroare de conectare";
+  if (dataSource !== "supabase") return "Mod local";
+  return manager?.role === "admin" ? "Conectat la Supabase" : "Totul functioneaza";
 }
