@@ -192,6 +192,7 @@ export default function HomePage() {
   const [loadError, setLoadError] = useState("");
   const [saveState, setSaveState] = useState("idle");
   const [saveError, setSaveError] = useState("");
+  const [liveNotice, setLiveNotice] = useState("");
   const [selectedId, setSelectedId] = useState(null);
   const [modalSource, setModalSource] = useState("direct");
   const [draft, setDraft] = useState(null);
@@ -208,9 +209,9 @@ export default function HomePage() {
   const [mobileView, setMobileView] = useState("inbox");
   const calendarGridRef = useRef(null);
 
-  useEffect(() => {
-    async function loadLeads() {
-      try {
+  async function refreshCrmData({ keepManager = false, reason = "" } = {}) {
+    try {
+      if (!keepManager) {
         const session = await getCurrentSession();
         if (!session) {
           window.location.href = "/login";
@@ -225,24 +226,37 @@ export default function HomePage() {
         }
         setCurrentManager(manager);
         setCrmConfig(await loadCrmConfig());
-        const remoteLeads = await loadSupabaseLeads();
-        setLeads(remoteLeads);
-        setDataSource("supabase");
+      }
+
+      const remoteLeads = await loadSupabaseLeads();
+      setLeads(remoteLeads);
+      setDataSource("supabase");
+      setLoadError("");
+      if (reason === "realtime") {
+        setLiveNotice("Mesaj nou primit");
+        window.setTimeout(() => setLiveNotice(""), 2200);
+      }
+    } catch (error) {
+      console.warn("Supabase load error:", error.message);
+      if (!supabase) {
+        const stored = window.localStorage.getItem("crm-next-leads") || window.localStorage.getItem("crm-leads");
+        const initial = stored ? JSON.parse(stored).map(normalizeLead) : makeDefaultLeads();
+        setLeads(initial);
+        setCrmConfig({ managers, stages, products, statuses: leadStatuses, religions, hooks });
+        setDataSource("local");
         setLoadError("");
-      } catch (error) {
-        console.warn("Supabase load error:", error.message);
-        if (!supabase) {
-          const stored = window.localStorage.getItem("crm-next-leads") || window.localStorage.getItem("crm-leads");
-          const initial = stored ? JSON.parse(stored).map(normalizeLead) : makeDefaultLeads();
-          setLeads(initial);
-          setCrmConfig({ managers, stages, products, statuses: leadStatuses, religions, hooks });
-          setDataSource("local");
-          setLoadError("");
-          return;
-        }
-        setLeads([]);
-        setDataSource("error");
-        setLoadError(error.message || "Supabase nu raspunde.");
+        return;
+      }
+      setLeads([]);
+      setDataSource("error");
+      setLoadError(error.message || "Supabase nu raspunde.");
+    }
+  }
+
+  useEffect(() => {
+    async function loadLeads() {
+      try {
+        await refreshCrmData();
       } finally {
         setLoaded(true);
       }
@@ -256,6 +270,28 @@ export default function HomePage() {
       window.localStorage.setItem("crm-next-leads", JSON.stringify(leads));
     }
   }, [leads, loaded]);
+
+  useEffect(() => {
+    if (!loaded || !supabase || dataSource !== "supabase") return;
+
+    let refreshTimer = null;
+    const scheduleRefresh = () => {
+      window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => {
+        refreshCrmData({ keepManager: true, reason: "realtime" });
+      }, 350);
+    };
+
+    const channel = supabase
+      .channel("crm-leads-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "leads" }, scheduleRefresh)
+      .subscribe();
+
+    return () => {
+      window.clearTimeout(refreshTimer);
+      supabase.removeChannel(channel);
+    };
+  }, [dataSource, loaded]);
 
   const filteredLeads = useMemo(() => {
     const currentManagerCode = currentManager?.code || FALLBACK_MANAGER_ID;
@@ -645,10 +681,10 @@ export default function HomePage() {
       </aside>
 
       <section className={`calendar-panel ${mobileView !== "calendar" ? "mobile-hidden" : ""}`}>
-        {connectionMessage(dataSource, currentManager, loadError, saveState, saveError) && (
+        {connectionMessage(dataSource, currentManager, loadError, saveState, saveError, liveNotice) && (
           <div className={`connection-banner ${dataSource === "error" || saveState === "error" ? "offline" : "online"}`}>
             <span>{connectionLabel(dataSource, currentManager)}</span>
-            <span>{connectionMessage(dataSource, currentManager, loadError, saveState, saveError)}</span>
+            <span>{connectionMessage(dataSource, currentManager, loadError, saveState, saveError, liveNotice)}</span>
           </div>
         )}
 
@@ -1244,11 +1280,12 @@ function connectionLabel(dataSource, manager) {
   return manager?.role === "admin" ? "Conectat la Supabase" : "Totul functioneaza";
 }
 
-function connectionMessage(dataSource, manager, loadError, saveState, saveError) {
+function connectionMessage(dataSource, manager, loadError, saveState, saveError, liveNotice) {
   if (dataSource === "error") return loadError || "Verifica conexiunea.";
   if (saveState === "error") return `Eroare: ${saveError || "salvare esuata"}`;
   if (saveState === "saving") return "Se salveaza...";
   if (saveState === "saved") return "Salvat";
+  if (liveNotice) return liveNotice;
   if (manager?.role === "admin") return "Gata";
   return "";
 }
