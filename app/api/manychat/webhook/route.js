@@ -30,13 +30,13 @@ export async function POST(request) {
 
 function normalizeManyChatPayload(payload) {
   const contact = payload.contact || payload.subscriber || payload.user || {};
-  const manyChatId = readFirst(payload.id, payload.subscriber_id, payload.contact_id, contact.id, contact.subscriber_id);
+  const manyChatId = normalizeManyChatContactId(readFirst(payload.id, payload.subscriber_id, payload.contact_id, contact.id, contact.subscriber_id, payload.key, contact.key));
   const firstName = readFirst(payload.first_name, contact.first_name);
   const lastName = readFirst(payload.last_name, contact.last_name);
   const fullName = readFirst(payload.name, payload.full_name, contact.name, contact.full_name, [firstName, lastName].filter(Boolean).join(" "));
 
   return {
-    metaContactId: readFirst(payload.meta_contact_id, payload.psid, payload.facebook_id, contact.psid, contact.facebook_id, manyChatId ? `manychat:${manyChatId}` : ""),
+    metaContactId: readFirst(payload.meta_contact_id, payload.psid, payload.facebook_id, contact.psid, contact.facebook_id, manyChatId),
     manyChatId: manyChatId || "",
     name: fullName || "Client ManyChat",
     platform: normalizePlatform(readFirst(payload.platform, payload.channel, contact.channel, "facebook")),
@@ -51,13 +51,7 @@ function normalizeManyChatPayload(payload) {
 
 async function upsertManyChatLead(supabase, message) {
   const now = new Date().toISOString();
-  const { data: existing, error: existingError } = await supabase
-    .from("leads")
-    .select("id, name, meta_email, meta_url, meta_url_verified, archived_at")
-    .eq("meta_contact_id", message.metaContactId)
-    .maybeSingle();
-
-  if (existingError) throw existingError;
+  const existing = await findExistingLead(supabase, message);
 
   if (existing) {
     const wasArchived = Boolean(existing.archived_at);
@@ -68,6 +62,7 @@ async function upsertManyChatLead(supabase, message) {
     const { data, error } = await supabase
       .from("leads")
       .update(removeUndefined({
+        meta_contact_id: message.metaContactId || undefined,
         name: message.name || existing.name,
         avatar_url: message.avatarUrl || undefined,
         meta_url: chooseUrl(existing.meta_url, existing.meta_url_verified, message.metaUrl),
@@ -124,8 +119,71 @@ async function upsertManyChatLead(supabase, message) {
   return data;
 }
 
+async function findExistingLead(supabase, message) {
+  const idVariants = contactIdVariants(message.metaContactId);
+  if (idVariants.length) {
+    const { data, error } = await supabase
+      .from("leads")
+      .select("id, name, meta_contact_id, meta_email, meta_url, meta_url_verified, archived_at")
+      .in("meta_contact_id", idVariants)
+      .order("created_at", { ascending: true })
+      .limit(1);
+
+    if (error) throw error;
+    if (data?.[0]) return data[0];
+  }
+
+  if (message.email) {
+    const { data, error } = await supabase
+      .from("leads")
+      .select("id, name, meta_contact_id, meta_email, meta_url, meta_url_verified, archived_at")
+      .or(`customer_email.eq.${message.email},email.eq.${message.email},meta_email.eq.${message.email}`)
+      .order("created_at", { ascending: true })
+      .limit(1);
+
+    if (error) throw error;
+    if (data?.[0]) return data[0];
+  }
+
+  if (message.phone) {
+    const { data, error } = await supabase
+      .from("leads")
+      .select("id, name, meta_contact_id, meta_email, meta_url, meta_url_verified, archived_at")
+      .eq("phone", message.phone)
+      .order("created_at", { ascending: true })
+      .limit(1);
+
+    if (error) throw error;
+    if (data?.[0]) return data[0];
+  }
+
+  if (message.name) {
+    const { data, error } = await supabase
+      .from("leads")
+      .select("id, name, meta_contact_id, meta_email, meta_url, meta_url_verified, archived_at")
+      .eq("platform", message.platform)
+      .ilike("name", message.name)
+      .order("created_at", { ascending: true })
+      .limit(1);
+
+    if (error) throw error;
+    if (data?.[0]) return data[0];
+  }
+
+  return null;
+}
+
 function readFirst(...values) {
   return values.find((value) => value !== undefined && value !== null && String(value).trim() !== "")?.toString().trim() || "";
+}
+
+function normalizeManyChatContactId(value) {
+  return String(value || "").trim().replace(/^user:/i, "").replace(/^manychat:/i, "");
+}
+
+function contactIdVariants(value) {
+  const id = normalizeManyChatContactId(value);
+  return [...new Set([id, id ? `manychat:${id}` : "", id ? `user:${id}` : ""].filter(Boolean))];
 }
 
 function normalizeDate(value) {

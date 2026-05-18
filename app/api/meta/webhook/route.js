@@ -262,26 +262,30 @@ function findClientParticipant(participants, contactId, pageId) {
 
 async function upsertLeadFromMessage(supabase, message) {
   const now = new Date().toISOString();
+  const contactIds = contactIdVariants(message.metaContactId);
   const { data: existing, error: existingError } = await supabase
     .from("leads")
     .select("id, name, platform, meta_email, meta_url, meta_url_verified, archived_at")
-    .eq("meta_contact_id", message.metaContactId)
-    .maybeSingle();
+    .in("meta_contact_id", contactIds)
+    .order("created_at", { ascending: true })
+    .limit(1);
 
   if (existingError) throw existingError;
+  const existingLead = existing?.[0];
 
-  if (existing) {
-    const wasArchived = Boolean(existing.archived_at);
+  if (existingLead) {
+    const wasArchived = Boolean(existingLead.archived_at);
     const { data: reactivatedStage } = wasArchived
       ? await supabase.from("stages").select("id").eq("code", "reactivated").maybeSingle()
       : { data: null };
     const { data, error } = await supabase
       .from("leads")
       .update({
+        meta_contact_id: message.metaContactId,
         name: message.name,
         avatar_url: message.avatarUrl,
-        meta_url: chooseMetaUrl(existing.meta_url, existing.meta_url_verified, message.metaUrl, message.metaContactId),
-        meta_email: message.email || existing.meta_email || null,
+        meta_url: chooseMetaUrl(existingLead.meta_url, existingLead.meta_url_verified, message.metaUrl, message.metaContactId),
+        meta_email: message.email || existingLead.meta_email || null,
         status: wasArchived ? "reactivated" : undefined,
         unread: true,
         archived_at: wasArchived ? null : undefined,
@@ -289,12 +293,12 @@ async function upsertLeadFromMessage(supabase, message) {
         last_message_at: message.messageAt || now,
         updated_at: now
       })
-      .eq("id", existing.id)
+      .eq("id", existingLead.id)
       .select("id, name, platform")
       .single();
 
     if (error) throw error;
-    await insertActivity(supabase, existing.id, wasArchived ? "reactivated_by_message" : "incoming_message", {
+    await insertActivity(supabase, existingLead.id, wasArchived ? "reactivated_by_message" : "incoming_message", {
       source: "meta_webhook",
       metaUrlSource: message.metaUrlSource || null,
       metaConversationId: message.metaConversationId || null
@@ -364,4 +368,9 @@ async function insertActivity(supabase, leadId, type, payload) {
 
 function normalizePlatform(platform) {
   return String(platform).toLowerCase().includes("instagram") ? "instagram" : "facebook";
+}
+
+function contactIdVariants(value) {
+  const id = String(value || "").trim().replace(/^manychat:/i, "").replace(/^user:/i, "");
+  return [...new Set([id, id ? `manychat:${id}` : "", id ? `user:${id}` : ""].filter(Boolean))];
 }
