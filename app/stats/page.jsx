@@ -58,11 +58,13 @@ export default function StatsPage() {
 
   return (
     <main className="stats-page-shell">
-      <AppNav active="stats" manager={currentManager} />
-      <div className={`connection-banner ${dataSource === "supabase" ? "online" : "offline"}`}>
-        <span>{connectionLabel(dataSource, currentManager)}</span>
-        <span>{loadError || "Statistici actualizate"}</span>
-      </div>
+      <AppNav active="stats" manager={currentManager} systemStatus={dataSource === "error" ? "error" : "ok"} />
+      {connectionMessage(dataSource, currentManager, loadError) && (
+        <div className={`connection-banner ${dataSource === "error" ? "offline" : "online"}`}>
+          <span>{connectionLabel(dataSource, currentManager)}</span>
+          <span>{connectionMessage(dataSource, currentManager, loadError)}</span>
+        </div>
+      )}
       <StatsPanel stats={stats} />
     </main>
   );
@@ -72,4 +74,10 @@ function connectionLabel(dataSource, manager) {
   if (dataSource === "error") return "Eroare de conectare";
   if (dataSource !== "supabase") return "Mod local";
   return manager?.role === "admin" ? "Conectat la Supabase" : "Totul functioneaza";
+}
+
+function connectionMessage(dataSource, manager, loadError) {
+  if (dataSource === "error") return loadError || "Verifica conexiunea.";
+  if (manager?.role === "admin") return "Statistici actualizate";
+  return "";
 }

@@ -67,6 +67,35 @@
   font-weight: 800;
 }
 
+.nav-user-status {
+  gap: 8px;
+}
+
+.status-dot {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 9px;
+  border-radius: 999px;
+  background: var(--green);
+  box-shadow: 0 0 0 3px var(--green-soft);
+}
+
+.nav-user-status.error .status-dot {
+  background: var(--rose);
+  box-shadow: 0 0 0 3px var(--rose-soft);
+}
+
+.nav-health-text {
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
+  color: var(--green);
+  white-space: nowrap;
+}
+
+.nav-user-status.error .nav-health-text {
+  color: var(--rose);
+}
+
 .app-nav button {
   color: var(--text);
 }
@@ -726,6 +755,10 @@
     min-width: 0;
     padding: 0 8px;
     text-align: center;
+  }
+
+  .nav-health-text {
+    display: none;
   }
 
   .nav-brand {

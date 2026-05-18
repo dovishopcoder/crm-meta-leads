@@ -583,7 +583,7 @@ export default function HomePage() {
   return (
     <main className="app-shell">
       <div className="crm-top-menu">
-        <AppNav active="crm" manager={currentManager} />
+        <AppNav active="crm" manager={currentManager} systemStatus={dataSource === "error" || saveState === "error" ? "error" : "ok"} />
       </div>
 
       <div className="mobile-crm-tabs" role="tablist" aria-label="Interfete CRM">
@@ -645,10 +645,12 @@ export default function HomePage() {
       </aside>
 
       <section className={`calendar-panel ${mobileView !== "calendar" ? "mobile-hidden" : ""}`}>
-        <div className={`connection-banner ${dataSource === "supabase" ? "online" : "offline"}`}>
-          <span>{connectionLabel(dataSource, currentManager)}</span>
-          <span>{loadError || (saveState === "saving" ? "Se salveaza..." : saveState === "saved" ? "Salvat" : saveState === "error" ? `Eroare: ${saveError || "salvare esuata"}` : "Gata")}</span>
-        </div>
+        {connectionMessage(dataSource, currentManager, loadError, saveState, saveError) && (
+          <div className={`connection-banner ${dataSource === "error" || saveState === "error" ? "offline" : "online"}`}>
+            <span>{connectionLabel(dataSource, currentManager)}</span>
+            <span>{connectionMessage(dataSource, currentManager, loadError, saveState, saveError)}</span>
+          </div>
+        )}
 
         <header className="calendar-toolbar">
           <div className="calendar-title">
@@ -1240,6 +1242,15 @@ function connectionLabel(dataSource, manager) {
   if (dataSource === "error") return "Eroare de conectare";
   if (dataSource !== "supabase") return "Mod local";
   return manager?.role === "admin" ? "Conectat la Supabase" : "Totul functioneaza";
+}
+
+function connectionMessage(dataSource, manager, loadError, saveState, saveError) {
+  if (dataSource === "error") return loadError || "Verifica conexiunea.";
+  if (saveState === "error") return `Eroare: ${saveError || "salvare esuata"}`;
+  if (saveState === "saving") return "Se salveaza...";
+  if (saveState === "saved") return "Salvat";
+  if (manager?.role === "admin") return "Gata";
+  return "";
 }
 
 function toDateKey(date) {

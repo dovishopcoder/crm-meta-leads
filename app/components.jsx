@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { signOut } from "./supabase-crm";
 
-export function AppNav({ active, manager }) {
+export function AppNav({ active, manager, systemStatus = "ok" }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   async function handleLogout() {
@@ -13,6 +13,7 @@ export function AppNav({ active, manager }) {
   }
 
   const userLabel = `${manager?.name} - ${manager?.role === "admin" ? "Admin" : "Manager"}`;
+  const statusLabel = systemStatus === "error" ? "Eroare" : "Totul functioneaza";
 
   return (
     <nav className="app-nav" aria-label="Navigare aplicatie">
@@ -37,7 +38,13 @@ export function AppNav({ active, manager }) {
       </div>
 
       <div className="nav-right">
-        {manager && <span className="nav-user">{userLabel}</span>}
+        {manager && (
+          <span className={`nav-user nav-user-status ${systemStatus === "error" ? "error" : "ok"}`}>
+            <span className="status-dot" aria-hidden="true" />
+            <span>{userLabel}</span>
+            {manager.role !== "admin" && <span className="nav-health-text">{statusLabel}</span>}
+          </span>
+        )}
         <span className="nav-brand" aria-label="NextTouch CRM">
           <img src="/nexttouch-logo.png" alt="NextTouch CRM" />
         </span>

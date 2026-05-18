@@ -101,11 +101,13 @@ export default function ArchivePage() {
 
   return (
     <main className="stats-page-shell">
-      <AppNav active="stats" manager={currentManager} />
-      <div className={`connection-banner ${dataSource === "supabase" ? "online" : "offline"}`}>
-        <span>{connectionLabel(dataSource, currentManager)}</span>
-        <span>{loadError || (saveState === "saving" ? "Se salveaza..." : saveState === "saved" ? "Salvat" : "Clienti inactivi")}</span>
-      </div>
+      <AppNav active="stats" manager={currentManager} systemStatus={dataSource === "error" || saveState === "error" ? "error" : "ok"} />
+      {connectionMessage(dataSource, currentManager, loadError, saveState) && (
+        <div className={`connection-banner ${dataSource === "error" || saveState === "error" ? "offline" : "online"}`}>
+          <span>{connectionLabel(dataSource, currentManager)}</span>
+          <span>{connectionMessage(dataSource, currentManager, loadError, saveState)}</span>
+        </div>
+      )}
 
       <ArchivePanel
         leads={archivedLeads}
@@ -184,4 +186,13 @@ function connectionLabel(dataSource, manager) {
   if (dataSource === "error") return "Eroare de conectare";
   if (dataSource !== "supabase") return "Mod local";
   return manager?.role === "admin" ? "Conectat la Supabase" : "Totul functioneaza";
+}
+
+function connectionMessage(dataSource, manager, loadError, saveState) {
+  if (dataSource === "error") return loadError || "Verifica conexiunea.";
+  if (saveState === "error") return loadError || "Nu s-a putut salva.";
+  if (saveState === "saving") return "Se salveaza...";
+  if (saveState === "saved") return "Salvat";
+  if (manager?.role === "admin") return "Clienti inactivi";
+  return "";
 }
