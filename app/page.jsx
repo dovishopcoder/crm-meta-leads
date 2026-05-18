@@ -611,15 +611,17 @@ export default function HomePage() {
           ))}
         </div>
 
-        <label className="compact-label">
-          Manager
-          <select value={managerFilter} onChange={(event) => setManagerFilter(event.target.value)}>
-            <option value="all">Toti managerii</option>
-            {activeManagers.map((manager) => (
-              <option key={manager.code} value={manager.code}>{manager.name}</option>
-            ))}
-          </select>
-        </label>
+        {currentManager?.role === "admin" && (
+          <label className="compact-label">
+            Manager
+            <select value={managerFilter} onChange={(event) => setManagerFilter(event.target.value)}>
+              <option value="all">Toti managerii</option>
+              {activeManagers.map((manager) => (
+                <option key={manager.code} value={manager.code}>{manager.name}</option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <label className="toggle-row">
           <input type="checkbox" checked={onlyMyLeads} onChange={(event) => setOnlyMyLeads(event.target.checked)} />
