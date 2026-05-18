@@ -1,11 +1,35 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { signOut } from "./supabase-crm";
 
 export function AppNav({ active, manager, systemStatus = "ok" }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const navRef = useRef(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    function closeOnOutsideClick(event) {
+      if (!navRef.current?.contains(event.target)) {
+        setMenuOpen(false);
+      }
+    }
+
+    function closeOnEscape(event) {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [menuOpen]);
 
   async function handleLogout() {
     await signOut();
@@ -16,7 +40,7 @@ export function AppNav({ active, manager, systemStatus = "ok" }) {
   const statusLabel = systemStatus === "error" ? "Eroare" : "Conectat";
 
   return (
-    <nav className="app-nav" aria-label="Navigare aplicatie">
+    <nav ref={navRef} className="app-nav" aria-label="Navigare aplicatie">
       <button
         type="button"
         className="nav-menu-toggle"
@@ -30,10 +54,10 @@ export function AppNav({ active, manager, systemStatus = "ok" }) {
       </button>
 
       <div className={`nav-links ${menuOpen ? "open" : ""}`}>
-        <Link className={active === "crm" ? "active" : ""} href="/">CRM</Link>
-        <Link className={active === "stats" ? "active" : ""} href="/stats">Statistici</Link>
-        {manager?.role === "admin" && <Link className={active === "checklist" ? "active" : ""} href="/checklist">Checklist</Link>}
-        {manager?.role === "admin" && <Link className={active === "admin" ? "active" : ""} href="/admin">Setari</Link>}
+        <Link className={active === "crm" ? "active" : ""} href="/" onClick={() => setMenuOpen(false)}>CRM</Link>
+        <Link className={active === "stats" ? "active" : ""} href="/stats" onClick={() => setMenuOpen(false)}>Statistici</Link>
+        {manager?.role === "admin" && <Link className={active === "checklist" ? "active" : ""} href="/checklist" onClick={() => setMenuOpen(false)}>Checklist</Link>}
+        {manager?.role === "admin" && <Link className={active === "admin" ? "active" : ""} href="/admin" onClick={() => setMenuOpen(false)}>Setari</Link>}
         {manager && <button type="button" onClick={handleLogout}>Logout</button>}
       </div>
 
