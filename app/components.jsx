@@ -53,7 +53,7 @@ export function AppNav({ active, manager, systemStatus = "ok" }) {
   );
 }
 
-export function StatsPanel({ stats }) {
+export function StatsPanel({ stats, showManagerStats = true }) {
   return (
     <section className="stats-panel stats-page-panel" aria-label="Statistici CRM">
       <div className="archive-head">
@@ -67,7 +67,7 @@ export function StatsPanel({ stats }) {
         {stats.cards.map((card) => <article key={card.label} className="stat-card"><span>{card.label}</span><strong>{card.value}</strong></article>)}
       </div>
       <div className="stats-layout">
-        <StatsTable title="Manageri" columns={["Manager", "Lead-uri", "Prelucrari", "Necitite", "Arhivate"]} rows={stats.managers} />
+        {showManagerStats && <StatsTable title="Manageri" columns={["Manager", "Lead-uri", "Prelucrari", "Necitite", "Arhivate"]} rows={stats.managers} />}
         <StatsTable title="Etape / Tags" columns={["Etapa", "Lead-uri", "Prelucrari"]} rows={stats.stages} />
         <StatsTable title="Produse propuse" columns={["Produs", "Propuneri", "Acceptate"]} rows={stats.products} />
       </div>

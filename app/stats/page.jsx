@@ -65,7 +65,7 @@ export default function StatsPage() {
           <span>{connectionMessage(dataSource, currentManager, loadError)}</span>
         </div>
       )}
-      <StatsPanel stats={stats} />
+      <StatsPanel stats={stats} showManagerStats={currentManager?.role === "admin"} />
     </main>
   );
 }
