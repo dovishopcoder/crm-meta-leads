@@ -811,6 +811,8 @@ function LeadCard({ lead, lookups, onOpen, onDragStart }) {
 
 function EventCard({ lead, lookups, onOpen, onDragStart }) {
   const { managerForConfig, stageForConfig, productForConfig, statusForConfig } = lookups;
+  const manager = managerForConfig(lead.managerId);
+  const isAssigned = lead.managerId && lead.managerId !== "unassigned";
   return (
     <article className={`event-card ${lead.platform} ${lead.priority === "high" ? "priority-high" : ""}`} draggable onDragStart={onDragStart}>
       <div className="event-card-head">
@@ -821,17 +823,21 @@ function EventCard({ lead, lookups, onOpen, onDragStart }) {
         </div>
       </div>
       {lead.unread && <div className="event-badges"><span className="status-pill unread-pill">Mesaj nou</span></div>}
-      <div className="manager-line">
-        <span className="manager-dot" style={{ "--manager-color": managerForConfig(lead.managerId).color }} />
-        <span>{managerForConfig(lead.managerId).name}</span>
-      </div>
-      <div className="tag-row">
-        <span className="tag-pill">{stageForConfig(lead.stage).name}</span>
-          {lead.products?.slice(0, 2).map((item) => <span key={item.id} className="tag-pill">{productForConfig(item.id).name}</span>)}
-      </div>
+      {isAssigned && (
+        <div className="manager-line">
+          <span className="manager-dot" style={{ "--manager-color": manager.color }} />
+          <span>{manager.name}</span>
+        </div>
+      )}
       <div className="event-actions">
+        <span className="tag-pill">{stageForConfig(lead.stage).name}</span>
         <button className="mini-btn primary" onClick={onOpen}>Detalii</button>
       </div>
+      {Boolean(lead.products?.length) && (
+        <div className="tag-row">
+          {lead.products.slice(0, 2).map((item) => <span key={item.id} className="tag-pill">{productForConfig(item.id).name}</span>)}
+        </div>
+      )}
     </article>
   );
 }
