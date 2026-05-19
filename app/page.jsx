@@ -813,8 +813,13 @@ function EventCard({ lead, lookups, onOpen, onDragStart }) {
   const { managerForConfig, stageForConfig, productForConfig, statusForConfig } = lookups;
   return (
     <article className={`event-card ${lead.platform} ${lead.priority === "high" ? "priority-high" : ""}`} draggable onDragStart={onDragStart}>
-      <strong>{lead.name}</strong>
-      <span>{platformLabel(lead.platform)} - {statusForConfig(lead.status).name}</span>
+      <div className="event-card-head">
+        <Avatar lead={lead} className="event-avatar" />
+        <div className="event-title">
+          <strong>{lead.name}</strong>
+          <span>{statusForConfig(lead.status).name}</span>
+        </div>
+      </div>
       {lead.unread && <div className="event-badges"><span className="status-pill unread-pill">Mesaj nou</span></div>}
       <div className="manager-line">
         <span className="manager-dot" style={{ "--manager-color": managerForConfig(lead.managerId).color }} />

@@ -493,6 +493,22 @@ label textarea {
   box-shadow: 0 7px 16px rgba(27, 39, 63, 0.06);
 }
 
+.event-card-head {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+}
+
+.event-avatar {
+  width: 36px;
+  height: 36px;
+}
+
+.event-title {
+  min-width: 0;
+}
+
 .event-card.facebook {
   border-left-color: var(--blue);
 }
@@ -514,6 +530,10 @@ label textarea {
   margin-top: 4px;
   color: var(--muted);
   font-size: 12px;
+}
+
+.event-title span {
+  margin-top: 2px;
 }
 
 .event-actions {
