@@ -959,7 +959,7 @@ function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning,
           </div>
 
           <div className="field-grid">
-            <label>Etapa / tag principal<select value={draft.stage} onChange={(event) => update("stage", event.target.value)}>{config.stages.map((stage) => <option key={stage.id} value={stage.id}>{stage.name}</option>)}</select></label>
+            <label>Etapa<select value={draft.stage} onChange={(event) => update("stage", event.target.value)}>{config.stages.map((stage) => <option key={stage.id} value={stage.id}>{stage.name}</option>)}</select></label>
             <label>Interes actual<select value={draft.currentInterest} onChange={(event) => update("currentInterest", event.target.value)}><option value="">Neindicat</option>{config.currentInterests.map((interest) => <option key={interest.id} value={interest.id}>{interest.name}</option>)}</select></label>
           </div>
 
