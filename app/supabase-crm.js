@@ -286,6 +286,10 @@ export async function updateHook(id, { code, name, position, active }) {
   return saveAdminSetting("PATCH", { id, type: "hook", code, name, position, active });
 }
 
+export async function deleteAdminSetting(type, id) {
+  return saveAdminSetting("DELETE", { id, type });
+}
+
 async function saveAdminSetting(method, body) {
   if (!supabase) throw new Error("Supabase nu este configurat.");
 

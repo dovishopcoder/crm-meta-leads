@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AppNav } from "../components";
-import { countActiveLeadsForManager, createHook, createLeadStatus, createManager, createProduct, createReligion, createStage, deleteManager, getCurrentSession, loadAdminData, loadCurrentManager, resetManagerPassword, transferActiveLeads, updateHook, updateLeadStatus, updateManager, updateProduct, updateReligion, updateStage } from "../supabase-crm";
+import { countActiveLeadsForManager, createHook, createLeadStatus, createManager, createProduct, createReligion, createStage, deleteAdminSetting, deleteManager, getCurrentSession, loadAdminData, loadCurrentManager, resetManagerPassword, transferActiveLeads, updateHook, updateLeadStatus, updateManager, updateProduct, updateReligion, updateStage } from "../supabase-crm";
 
 export default function AdminPage() {
   const [currentManager, setCurrentManager] = useState(null);
@@ -197,6 +197,21 @@ export default function AdminPage() {
     await submitAdminAction(() => deleteManager(manager.id), "Managerul a fost sters.");
   }
 
+  async function handleDeleteSetting(type, row) {
+    const labels = {
+      stage: "etapa",
+      product: "produsul",
+      status: "statusul",
+      religion: "religia",
+      hook: "hook-ul"
+    };
+    const confirmed = window.confirm(`Stergi ${labels[type] || "setarea"} "${row.name}"?`);
+    if (!confirmed) return;
+
+    await submitAdminAction(() => deleteAdminSetting(type, row.id), "Setarea a fost stearsa.");
+    if (editing?.type === type && editing.id === row.id) cancelEdit();
+  }
+
   async function handleResetPassword(manager) {
     const password = passwordDrafts[manager.id] || "";
     await submitAdminAction(() => resetManagerPassword(manager.id, password), `Parola pentru ${manager.name} a fost schimbata.`);
@@ -295,6 +310,7 @@ export default function AdminPage() {
             onEditForm={setEditForm}
             onSave={saveEdit}
             onCancel={cancelEdit}
+            onDelete={handleDeleteSetting}
           />
         </section>
 
@@ -317,6 +333,7 @@ export default function AdminPage() {
             onEditForm={setEditForm}
             onSave={saveEdit}
             onCancel={cancelEdit}
+            onDelete={handleDeleteSetting}
           />
         </section>
 
@@ -339,6 +356,7 @@ export default function AdminPage() {
             onEditForm={setEditForm}
             onSave={saveEdit}
             onCancel={cancelEdit}
+            onDelete={handleDeleteSetting}
           />
         </section>
 
@@ -361,6 +379,7 @@ export default function AdminPage() {
             onEditForm={setEditForm}
             onSave={saveEdit}
             onCancel={cancelEdit}
+            onDelete={handleDeleteSetting}
           />
         </section>
 
@@ -382,6 +401,7 @@ export default function AdminPage() {
             onEditForm={setEditForm}
             onSave={saveEdit}
             onCancel={cancelEdit}
+            onDelete={handleDeleteSetting}
           />
         </section>
       </div>
@@ -443,8 +463,8 @@ function AdminTable({ title, columns, rows, type, editing, editForm, onEdit, onE
                           <button className="mini-btn" type="button" onClick={() => onPasswordReset(row)} disabled={(passwordDrafts[row.id] || "").length < 6}>Schimba parola</button>
                         </>
                       )}
-                      {type === "manager" && row.id !== currentManagerId && (
-                        <button className="mini-btn danger" type="button" onClick={() => onDelete(row)}>Sterge</button>
+                      {onDelete && (type !== "manager" || row.id !== currentManagerId) && (
+                        <button className="mini-btn danger" type="button" onClick={() => (type === "manager" ? onDelete(row) : onDelete(type, row))}>Sterge</button>
                       )}
                     </div>
                   )}
@@ -608,3 +628,4 @@ function EditableCells({ type, form, onChange }) {
     </>
   );
 }
+

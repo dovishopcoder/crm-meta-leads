@@ -125,6 +125,24 @@ export async function PATCH(request) {
   }
 }
 
+export async function DELETE(request) {
+  try {
+    const supabase = serverSupabase();
+    await requireAdmin(request, supabase);
+    const body = await request.json();
+    const type = String(body.type || "").trim();
+    const table = TABLES[type];
+    const id = String(body.id || "").trim();
+    if (!table || !id) return NextResponse.json({ error: "Setarea lipseste." }, { status: 400 });
+
+    const { error } = await supabase.from(table).delete().eq("id", id);
+    if (error) throw error;
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return NextResponse.json({ error: error.message || "Nu s-a putut sterge setarea." }, { status: 500 });
+  }
+}
+
 async function requireAdmin(request, supabase) {
   const manager = await requireManager(request, supabase);
   if (manager.role !== "admin") throw new Error("Doar adminul poate modifica setarile.");
