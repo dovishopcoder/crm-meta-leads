@@ -305,7 +305,7 @@ export default function HomePage() {
       if (activeFilter !== "all" && lead.platform !== activeFilter) return false;
       if (onlyMyLeads && lead.managerId !== currentManagerCode && lead.managerId !== "unassigned") return false;
       if (managerFilter !== "all" && lead.managerId !== managerFilter) return false;
-      const haystack = [lead.name, lead.platform, lead.status, lead.phone, lead.notes, managerForConfig(lead.managerId).name, ...(lead.tags || [])]
+      const haystack = [lead.name, lead.platform, lead.status, lead.phone, lead.notes, ...(lead.comments || []).map((comment) => comment.text).join(" "), managerForConfig(lead.managerId).name, ...(lead.tags || [])]
         .join(" ")
         .toLowerCase();
       return haystack.includes(search.toLowerCase());
@@ -431,6 +431,7 @@ export default function HomePage() {
     }
 
     const now = toIso(new Date());
+    const initialComment = manualLead.notes.trim();
     const existingLead = leads.find((lead) => normalizeMetaUrl(lead.metaUrl) === normalizeMetaUrl(metaUrl));
 
     if (existingLead) {
@@ -466,7 +467,8 @@ export default function HomePage() {
       priority: manualLead.priority,
       tags: [],
       phone: manualLead.phone.trim(),
-      notes: manualLead.notes.trim(),
+      notes: "",
+      comments: initialComment ? [{ text: initialComment, managerId: currentManager?.code || manualLead.managerId || "unassigned", createdAt: now }] : [],
       followDate: ""
     };
 
@@ -534,6 +536,7 @@ export default function HomePage() {
     updateLead(selectedLead.id, (lead) => {
       const previousStage = lead.stage || "new";
       const previousInterest = lead.currentInterest || "";
+      const newComment = draft.notes.trim();
       const previousProducts = new Set((lead.products || []).map((item) => item.id));
       const selectedProducts = draft.products.map((productId) => {
         const existing = (lead.products || []).find((item) => item.id === productId);
@@ -559,7 +562,13 @@ export default function HomePage() {
       lead.products = selectedProducts;
       lead.customerEmail = draft.customerEmail.trim();
       lead.phone = draft.phone.trim();
-      lead.notes = draft.notes.trim();
+      lead.notes = lead.notes || "";
+      if (newComment) {
+        lead.comments = [
+          ...(lead.comments || []),
+          { text: newComment, managerId: currentManager?.code || draft.managerId || "unassigned", createdAt: now }
+        ];
+      }
       lead.processedCount = (lead.processedCount || 0) + 1;
       lead.lastProcessedAt = now;
 
@@ -582,7 +591,8 @@ export default function HomePage() {
           stage: lead.stage,
           followDate: lead.followDate,
           products: selectedProducts.filter((item) => !previousProducts.has(item.id)).map((item) => item.id),
-          currentInterest: previousInterest !== lead.currentInterest ? lead.currentInterest : ""
+          currentInterest: previousInterest !== lead.currentInterest ? lead.currentInterest : "",
+          commentAdded: Boolean(newComment)
         }
       ];
       return lead;
@@ -776,6 +786,7 @@ export default function HomePage() {
           config={{ managers: activeManagers, stages: activeStages, products: activeProducts, statuses: activeStatuses, religions: activeReligions, hooks: activeHooks, currentInterests: activeCurrentInterests }}
           isAdmin={currentManager?.role === "admin"}
           lookups={{ managerForConfig, stageForConfig, productForConfig, statusForConfig, currentInterestForConfig }}
+          currentManager={currentManager}
           onChange={setDraft}
           onClose={closeModal}
           onArchive={archiveSelectedLead}
@@ -916,7 +927,7 @@ function ManualLeadModal({ draft, error, managers, hooks, onChange, onClose, onS
   );
 }
 
-function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning, config, isAdmin, lookups, onChange, onClose, onArchive, onSave }) {
+function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning, config, isAdmin, lookups, currentManager, onChange, onClose, onArchive, onSave }) {
   function update(field, value) {
     onChange({ ...draft, [field]: value });
   }
@@ -995,7 +1006,7 @@ function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning,
             <label>Telefon / contact extra<input value={draft.phone} onChange={(event) => update("phone", event.target.value)} placeholder="+373..." /></label>
           </div>
           <label>Link Meta direct<input value={draft.metaUrl} onChange={(event) => update("metaUrl", event.target.value)} placeholder="https://business.facebook.com/latest/inbox/all?..." /></label>
-          <label>Comentarii<textarea value={draft.notes} onChange={(event) => update("notes", event.target.value)} rows={5} placeholder="Note interne despre client" /></label>
+          <CommentsPanel lead={lead} draft={draft} currentManager={currentManager} lookups={lookups} onChange={update} />
           {warning && <p className="modal-warning">{warning}</p>}
 
           <div className="modal-actions">
@@ -1028,6 +1039,56 @@ function ClientHistory({ lead, lookups }) {
       </div>
     </section>
   );
+}
+
+function CommentsPanel({ lead, draft, currentManager, lookups, onChange }) {
+  const comments = buildCommentList(lead);
+  const authorName = currentManager?.name || lookups.managerForConfig(currentManager?.code || lead.managerId).name;
+
+  return (
+    <section className="modal-section comments-section">
+      <div className="comments-head">
+        <div>
+          <p className="eyebrow">Comentarii</p>
+          <h3>Istoric comentarii</h3>
+        </div>
+        <span className="comment-author">{authorName}</span>
+      </div>
+
+      <label className="comment-compose">
+        Comentariu nou
+        <textarea value={draft.notes} onChange={(event) => onChange("notes", event.target.value)} rows={3} placeholder="Scrie comentariul intern" />
+      </label>
+
+      <div className="comments-list" aria-label="Lista comentarii">
+        {comments.map((comment, index) => (
+          <article key={`${comment.createdAt}-${index}`} className="comment-bubble">
+            <div className="comment-meta">
+              <strong>{comment.managerId ? lookups.managerForConfig(comment.managerId).name : comment.author}</strong>
+              <span>{formatDateTime(comment.createdAt)}</span>
+            </div>
+            <p>{comment.text}</p>
+          </article>
+        ))}
+        {!comments.length && <p className="empty-history">Nu exista comentarii pentru acest client.</p>}
+      </div>
+    </section>
+  );
+}
+
+function buildCommentList(lead) {
+  const comments = [...(lead.comments || [])];
+  if (lead.notes) {
+    comments.push({
+      text: lead.notes,
+      author: "Comentariu vechi",
+      managerId: "",
+      createdAt: lead.lastProcessedAt || lead.createdAt
+    });
+  }
+  return comments
+    .filter((comment) => comment.text && comment.createdAt)
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
 }
 
 function buildClientHistory(lead, lookups) {
@@ -1219,6 +1280,7 @@ function normalizeLead(lead) {
     lastProcessedAt: lead.lastProcessedAt || "",
     tagHistory: Array.isArray(lead.tagHistory) ? lead.tagHistory : [],
     currentInterestHistory: Array.isArray(lead.currentInterestHistory) ? lead.currentInterestHistory : [],
+    comments: Array.isArray(lead.comments) ? lead.comments : [],
     products: Array.isArray(lead.products) ? lead.products.map((item) => (typeof item === "string" ? { id: item, status: "proposed", proposedAt: now, managerId: lead.managerId || "unassigned" } : item)) : [],
     activity: Array.isArray(lead.activity) ? lead.activity : []
   };
@@ -1253,7 +1315,7 @@ function makeLeadDraft(lead) {
     metaUrlVerified: Boolean(lead.metaUrlVerified),
     customerEmail: lead.customerEmail || "",
     phone: lead.phone || "",
-    notes: lead.notes || "",
+    notes: "",
     products: (lead.products || []).map((item) => item.id)
   };
 }

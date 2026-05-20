@@ -748,6 +748,54 @@ label textarea {
   font-weight: 750;
 }
 
+.comments-section {
+  display: grid;
+  gap: 12px;
+}
+
+.comments-head,
+.comment-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.comment-author,
+.comment-meta span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.comment-compose textarea {
+  margin-top: 2px;
+}
+
+.comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  max-height: 260px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.comment-bubble {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.comment-bubble p {
+  margin: 7px 0 0;
+  color: var(--text);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  user-select: text;
+}
+
 .ghost-btn,
 .danger-btn,
 .primary-btn {

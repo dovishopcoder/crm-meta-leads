@@ -333,7 +333,7 @@ export async function loadSupabaseLeads() {
   const refs = await ensureReferenceData();
   let { data, error } = await supabase
     .from("leads")
-    .select("*, lead_tags(tag), lead_products(status, proposed_at, product_id, products(code, name)), lead_interest_history(interest_code, changed_at, manager_id)")
+    .select("*, lead_tags(tag), lead_products(status, proposed_at, product_id, products(code, name)), lead_interest_history(interest_code, changed_at, manager_id), lead_comments(comment, manager_id, created_at)")
     .order("created_at", { ascending: true });
 
   if (error && isMissingTableError(error)) {
@@ -414,6 +414,7 @@ export async function saveSupabaseLead(lead, options = {}) {
   await saveLeadTags(savedId, lead.tags || []);
   await saveLeadProducts(savedId, lead.products || [], refs);
   await saveLeadInterestHistory(savedId, lead.currentInterestHistory || [], refs);
+  await saveLeadComments(savedId, lead.comments || [], refs);
   return { ...lead, id: savedId, metaContactId: leadRow.meta_contact_id };
 }
 
@@ -539,6 +540,11 @@ function fromSupabaseLead(row, refs) {
       changedAt: entry.changed_at,
       managerId: refs.managerUuidToCode[entry.manager_id] || "unassigned"
     })),
+    comments: (row.lead_comments || []).map((comment) => ({
+      text: comment.comment,
+      managerId: refs.managerUuidToCode[comment.manager_id] || "unassigned",
+      createdAt: comment.created_at
+    })),
     products: (row.lead_products || []).map((item) => ({
       id: item.products?.code || refs.productUuidToCode[item.product_id],
       status: item.status,
@@ -618,6 +624,30 @@ async function saveLeadInterestHistory(leadId, history, refs) {
 
   if (!rows.length) return;
   const { error } = await supabase.from("lead_interest_history").insert(rows);
+  if (error) {
+    if (isMissingTableError(error)) return;
+    throw error;
+  }
+}
+
+async function saveLeadComments(leadId, comments, refs) {
+  const deleteResult = await supabase.from("lead_comments").delete().eq("lead_id", leadId);
+  if (deleteResult.error) {
+    if (isMissingTableError(deleteResult.error)) return;
+    throw deleteResult.error;
+  }
+
+  const rows = comments
+    .filter((comment) => comment.text)
+    .map((comment) => ({
+      lead_id: leadId,
+      comment: comment.text,
+      manager_id: refs.managerCodeToUuid[comment.managerId] || null,
+      created_at: comment.createdAt || new Date().toISOString()
+    }));
+
+  if (!rows.length) return;
+  const { error } = await supabase.from("lead_comments").insert(rows);
   if (error) {
     if (isMissingTableError(error)) return;
     throw error;
