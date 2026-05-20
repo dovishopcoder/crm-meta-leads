@@ -93,6 +93,7 @@ export function StatsPanel({ stats, showManagerStats = true }) {
       <div className="stats-layout">
         {showManagerStats && <StatsTable title="Manageri" columns={["Manager", "Lead-uri", "Prelucrari", "Necitite", "Arhivate"]} rows={stats.managers} />}
         <StatsTable title="Etape / Tags" columns={["Etapa", "Lead-uri", "Prelucrari"]} rows={stats.stages} />
+        <StatsTable title="Interes actual" columns={["Interes", "Lead-uri active", "Schimbari in istoric"]} rows={stats.currentInterests || []} />
         <StatsTable title="Produse propuse" columns={["Produs", "Propuneri", "Acceptate"]} rows={stats.products} />
       </div>
     </section>

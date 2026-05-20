@@ -212,7 +212,7 @@ export function normalizeLead(lead) {
   };
 }
 
-export function buildStats(leads, config = { managers, stages, products }) {
+export function buildStats(leads, config = { managers, stages, products, currentInterests }) {
   const total = leads.length;
   const unread = leads.filter((lead) => lead.unread && !lead.archived).length;
   const archived = leads.filter((lead) => lead.archived).length;
@@ -239,6 +239,11 @@ export function buildStats(leads, config = { managers, stages, products }) {
     products: config.products.map((product) => {
       const proposed = leads.flatMap((lead) => lead.products || []).filter((item) => item.id === product.id);
       return [product.name, proposed.length, proposed.filter((item) => item.status === "accepted").length];
+    }),
+    currentInterests: (config.currentInterests || currentInterests).map((interest) => {
+      const activeLeads = leads.filter((lead) => !lead.archived && lead.currentInterest === interest.id);
+      const historyCount = leads.flatMap((lead) => lead.currentInterestHistory || []).filter((entry) => entry.interest === interest.id).length;
+      return [interest.name, activeLeads.length, historyCount];
     })
   };
 }

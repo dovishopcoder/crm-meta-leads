@@ -331,10 +331,19 @@ export async function loadSupabaseLeads() {
   if (!supabase) throw new Error("Supabase nu este configurat.");
 
   const refs = await ensureReferenceData();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("leads")
-    .select("*, lead_tags(tag), lead_products(status, proposed_at, product_id, products(code, name))")
+    .select("*, lead_tags(tag), lead_products(status, proposed_at, product_id, products(code, name)), lead_interest_history(interest_code, changed_at, manager_id)")
     .order("created_at", { ascending: true });
+
+  if (error && isMissingTableError(error)) {
+    const fallback = await supabase
+      .from("leads")
+      .select("*, lead_tags(tag), lead_products(status, proposed_at, product_id, products(code, name))")
+      .order("created_at", { ascending: true });
+    data = fallback.data;
+    error = fallback.error;
+  }
 
   if (error) throw error;
 
@@ -404,6 +413,7 @@ export async function saveSupabaseLead(lead, options = {}) {
 
   await saveLeadTags(savedId, lead.tags || []);
   await saveLeadProducts(savedId, lead.products || [], refs);
+  await saveLeadInterestHistory(savedId, lead.currentInterestHistory || [], refs);
   return { ...lead, id: savedId, metaContactId: leadRow.meta_contact_id };
 }
 
@@ -524,6 +534,11 @@ function fromSupabaseLead(row, refs) {
     processedCount: row.processed_count || 0,
     lastProcessedAt: row.last_processed_at || "",
     tagHistory: [],
+    currentInterestHistory: (row.lead_interest_history || []).map((entry) => ({
+      interest: entry.interest_code,
+      changedAt: entry.changed_at,
+      managerId: refs.managerUuidToCode[entry.manager_id] || "unassigned"
+    })),
     products: (row.lead_products || []).map((item) => ({
       id: item.products?.code || refs.productUuidToCode[item.product_id],
       status: item.status,
@@ -583,6 +598,30 @@ async function saveLeadProducts(leadId, selectedProducts, refs) {
   if (!rows.length) return;
   const { error } = await supabase.from("lead_products").insert(rows);
   if (error) throw error;
+}
+
+async function saveLeadInterestHistory(leadId, history, refs) {
+  const deleteResult = await supabase.from("lead_interest_history").delete().eq("lead_id", leadId);
+  if (deleteResult.error) {
+    if (isMissingTableError(deleteResult.error)) return;
+    throw deleteResult.error;
+  }
+
+  const rows = history
+    .filter((entry) => entry.interest)
+    .map((entry) => ({
+      lead_id: leadId,
+      interest_code: entry.interest,
+      manager_id: refs.managerCodeToUuid[entry.managerId] || null,
+      changed_at: entry.changedAt || new Date().toISOString()
+    }));
+
+  if (!rows.length) return;
+  const { error } = await supabase.from("lead_interest_history").insert(rows);
+  if (error) {
+    if (isMissingTableError(error)) return;
+    throw error;
+  }
 }
 
 function managerNameToCode(name) {

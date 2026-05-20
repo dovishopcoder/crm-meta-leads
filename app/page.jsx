@@ -371,6 +371,10 @@ export default function HomePage() {
     return activeReligions.find((religion) => religion.id === tag || religion.name.toLowerCase() === String(tag).toLowerCase())?.name || tag;
   }
 
+  function currentInterestForConfig(id) {
+    return activeCurrentInterests.find((interest) => interest.id === id) || currentInterests.find((interest) => interest.id === id) || { id, name: id || "Neindicat" };
+  }
+
   function goToToday() {
     setCursorDate(startOfDay(new Date()));
     window.requestAnimationFrame(() => {
@@ -529,6 +533,7 @@ export default function HomePage() {
     const now = toIso(new Date());
     updateLead(selectedLead.id, (lead) => {
       const previousStage = lead.stage || "new";
+      const previousInterest = lead.currentInterest || "";
       const previousProducts = new Set((lead.products || []).map((item) => item.id));
       const selectedProducts = draft.products.map((productId) => {
         const existing = (lead.products || []).find((item) => item.id === productId);
@@ -561,6 +566,12 @@ export default function HomePage() {
       if (previousStage !== lead.stage) {
         lead.tagHistory = [...(lead.tagHistory || []), { from: previousStage, to: lead.stage, changedAt: now, managerId: draft.managerId }];
       }
+      if (previousInterest !== lead.currentInterest && lead.currentInterest) {
+        lead.currentInterestHistory = [
+          ...(lead.currentInterestHistory || []),
+          { interest: lead.currentInterest, changedAt: now, managerId: draft.managerId }
+        ];
+      }
 
       lead.activity = [
         ...(lead.activity || []),
@@ -570,7 +581,8 @@ export default function HomePage() {
           managerId: draft.managerId,
           stage: lead.stage,
           followDate: lead.followDate,
-          products: selectedProducts.filter((item) => !previousProducts.has(item.id)).map((item) => item.id)
+          products: selectedProducts.filter((item) => !previousProducts.has(item.id)).map((item) => item.id),
+          currentInterest: previousInterest !== lead.currentInterest ? lead.currentInterest : ""
         }
       ];
       return lead;
@@ -763,7 +775,7 @@ export default function HomePage() {
           warning={warning}
           config={{ managers: activeManagers, stages: activeStages, products: activeProducts, statuses: activeStatuses, religions: activeReligions, hooks: activeHooks, currentInterests: activeCurrentInterests }}
           isAdmin={currentManager?.role === "admin"}
-          lookups={{ managerForConfig, stageForConfig, productForConfig, statusForConfig }}
+          lookups={{ managerForConfig, stageForConfig, productForConfig, statusForConfig, currentInterestForConfig }}
           onChange={setDraft}
           onClose={closeModal}
           onArchive={archiveSelectedLead}
@@ -1045,6 +1057,14 @@ function buildClientHistory(lead, lookups) {
     });
   });
 
+  (lead.currentInterestHistory || []).forEach((entry) => {
+    items.push({
+      at: entry.changedAt,
+      title: "Interes actual",
+      detail: lookups.currentInterestForConfig(entry.interest).name
+    });
+  });
+
   (lead.activity || []).forEach((activity) => {
     items.push({
       at: activity.at,
@@ -1074,6 +1094,7 @@ function activityDetail(activity, lookups) {
   if (activity.type === "processed") {
     const details = [];
     if (activity.stage) details.push(`Etapa: ${lookups.stageForConfig(activity.stage).name}`);
+    if (activity.currentInterest) details.push(`Interes: ${lookups.currentInterestForConfig(activity.currentInterest).name}`);
     if (activity.followDate) details.push(`Follow-up: ${formatShortDate(parseKey(activity.followDate))}`);
     if (activity.products?.length) details.push(`Produse noi: ${activity.products.map((id) => lookups.productForConfig(id).name).join(", ")}`);
     return details.join(" · ");
@@ -1197,6 +1218,7 @@ function normalizeLead(lead) {
     processedCount: lead.processedCount || 0,
     lastProcessedAt: lead.lastProcessedAt || "",
     tagHistory: Array.isArray(lead.tagHistory) ? lead.tagHistory : [],
+    currentInterestHistory: Array.isArray(lead.currentInterestHistory) ? lead.currentInterestHistory : [],
     products: Array.isArray(lead.products) ? lead.products.map((item) => (typeof item === "string" ? { id: item, status: "proposed", proposedAt: now, managerId: lead.managerId || "unassigned" } : item)) : [],
     activity: Array.isArray(lead.activity) ? lead.activity : []
   };
