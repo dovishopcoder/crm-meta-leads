@@ -1,7 +1,7 @@
 "use client";
 
 import { createClient } from "@supabase/supabase-js";
-import { hooks, makeDefaultLeads } from "./crm-data.js";
+import { currentInterests, hooks, makeDefaultLeads } from "./crm-data.js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -151,6 +151,13 @@ export async function loadCrmConfig() {
       name: hook.name,
       position: hook.position,
       active: hook.active
+    })),
+    currentInterests: (data.currentInterests?.length ? data.currentInterests : currentInterests).map((interest) => ({
+      id: interest.code || interest.id,
+      uuid: interest.id,
+      name: interest.name,
+      position: interest.position,
+      active: interest.active
     }))
   };
 }
@@ -237,6 +244,10 @@ export async function createHook({ code, name, position }) {
   return saveAdminSetting("POST", { type: "hook", code, name, position, active: true });
 }
 
+export async function createCurrentInterest({ code, name, position }) {
+  return saveAdminSetting("POST", { type: "currentInterest", code, name, position, active: true });
+}
+
 export async function updateManager(id, { name, email, role, color, active }) {
   if (!supabase) throw new Error("Supabase nu este configurat.");
   const { error } = await supabase.from("managers").update({ name, email, role, color, active }).eq("id", id);
@@ -284,6 +295,10 @@ export async function updateReligion(id, { code, name, position, active }) {
 
 export async function updateHook(id, { code, name, position, active }) {
   return saveAdminSetting("PATCH", { id, type: "hook", code, name, position, active });
+}
+
+export async function updateCurrentInterest(id, { code, name, position, active }) {
+  return saveAdminSetting("PATCH", { id, type: "currentInterest", code, name, position, active });
 }
 
 export async function deleteAdminSetting(type, id) {
@@ -346,6 +361,7 @@ export async function saveSupabaseLead(lead, options = {}) {
     email: lead.customerEmail || null,
     customer_email: lead.customerEmail || null,
     hook: lead.hook || null,
+    current_interest: lead.currentInterest || null,
     phone: lead.phone || null,
     notes: lead.notes || null,
     status: lead.status,
@@ -365,7 +381,7 @@ export async function saveSupabaseLead(lead, options = {}) {
   let savedId = lead.id;
 
   if (isUuid(lead.id)) {
-    const { error } = await saveLeadRowWithHookFallback(() => supabase.from("leads").update(leadRow).eq("id", lead.id), leadRow);
+    const { error } = await saveLeadRowWithColumnFallback(() => supabase.from("leads").update(leadRow).eq("id", lead.id), leadRow);
     if (error) throw error;
   } else {
     const existingByUrl = await findExistingLeadByMetaUrl(leadRow.meta_url);
@@ -373,14 +389,14 @@ export async function saveSupabaseLead(lead, options = {}) {
       if (options.rejectDuplicateMetaUrl) {
         throw new Error("Acest lead exista deja in CRM. Nu poti crea acelasi lead de doua ori.");
       }
-      const { error } = await saveLeadRowWithHookFallback(() => supabase.from("leads").update({
+      const { error } = await saveLeadRowWithColumnFallback(() => supabase.from("leads").update({
         ...leadRow,
         first_message_at: existingByUrl.first_message_at || leadRow.first_message_at
       }).eq("id", existingByUrl.id), leadRow);
       if (error) throw error;
       savedId = existingByUrl.id;
     } else {
-      const { data, error } = await saveLeadRowWithHookFallback(() => supabase.from("leads").upsert(leadRow, { onConflict: "meta_contact_id" }).select("id").single(), leadRow);
+      const { data, error } = await saveLeadRowWithColumnFallback(() => supabase.from("leads").upsert(leadRow, { onConflict: "meta_contact_id" }).select("id").single(), leadRow);
       if (error) throw error;
       savedId = data.id;
     }
@@ -404,11 +420,22 @@ async function findExistingLeadByMetaUrl(metaUrl) {
   return data?.[0] || null;
 }
 
-async function saveLeadRowWithHookFallback(action, leadRow) {
-  const result = await action();
-  if (!result.error || !isMissingHookColumnError(result.error)) return result;
-  delete leadRow.hook;
-  return action();
+async function saveLeadRowWithColumnFallback(action, leadRow) {
+  const optionalColumns = ["hook", "current_interest"];
+  let result = await action();
+  let changed = true;
+  while (result.error && changed) {
+    changed = false;
+    for (const column of optionalColumns) {
+      if (column in leadRow && isMissingLeadColumnError(result.error, column)) {
+        delete leadRow[column];
+        result = await action();
+        changed = true;
+        break;
+      }
+    }
+  }
+  return result;
 }
 
 async function ensureReferenceData() {
@@ -463,8 +490,8 @@ function isMissingTableError(error) {
   return error?.code === "42P01" || /schema cache|does not exist|Could not find the table/i.test(error?.message || "");
 }
 
-function isMissingHookColumnError(error) {
-  return error?.code === "PGRST204" && /hook/i.test(error?.message || "");
+function isMissingLeadColumnError(error, column) {
+  return error?.code === "PGRST204" && new RegExp(column, "i").test(error?.message || "");
 }
 
 async function seedDemoLeads(refs) {
@@ -485,6 +512,7 @@ function fromSupabaseLead(row, refs) {
     email: row.email || "",
     customerEmail: row.customer_email || "",
     hook: row.hook || "",
+    currentInterest: row.current_interest || "",
     status: row.status,
     unread: row.unread,
     archived: Boolean(row.archived_at),

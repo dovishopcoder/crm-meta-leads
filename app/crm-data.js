@@ -47,6 +47,11 @@ export const hooks = [
   { id: "critice", name: "Critice" }
 ];
 
+export const currentInterests = [
+  { id: "rugaciune", name: "Rugăciune" },
+  { id: "bibletoday", name: "BibleToday" }
+];
+
 export function makeDefaultLeads() {
   return [
     {

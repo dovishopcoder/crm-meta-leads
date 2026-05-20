@@ -10,7 +10,8 @@ const TABLES = {
   product: "products",
   status: "lead_statuses",
   religion: "religions",
-  hook: "hook_options"
+  hook: "hook_options",
+  currentInterest: "current_interests"
 };
 
 const DEFAULT_STATUSES = [
@@ -34,6 +35,11 @@ const DEFAULT_HOOKS = [
   { code: "critice", name: "Critice", position: 4, active: true }
 ];
 
+const DEFAULT_CURRENT_INTERESTS = [
+  { code: "rugaciune", name: "Rugăciune", position: 1, active: true },
+  { code: "bibletoday", name: "BibleToday", position: 2, active: true }
+];
+
 function serverSupabase() {
   if (!supabaseUrl || !serviceRoleKey) throw new Error("Supabase server env is missing.");
   return createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
@@ -49,20 +55,21 @@ export async function GET(request) {
     const supabase = serverSupabase();
     await requireManager(request, supabase);
 
-    const [managerResult, stageResult, productResult, statusResult, religionResult, hookResult, audienceResult] = await Promise.all([
+    const [managerResult, stageResult, productResult, statusResult, religionResult, hookResult, currentInterestResult, audienceResult] = await Promise.all([
       supabase.from("managers").select("id, name, email, role, color, active, created_at").order("created_at", { ascending: true }),
       supabase.from("stages").select("id, code, name, position, active, created_at").order("position", { ascending: true }),
       supabase.from("products").select("id, code, name, active, created_at").order("created_at", { ascending: true }),
       loadOptionRows(supabase, "lead_statuses", DEFAULT_STATUSES),
       loadOptionRows(supabase, "religions", DEFAULT_RELIGIONS),
       loadOptionRows(supabase, "hook_options", DEFAULT_HOOKS),
+      loadOptionRows(supabase, "current_interests", DEFAULT_CURRENT_INTERESTS),
       supabase
         .from("leads")
         .select("id, name, platform, customer_email, meta_email, meta_contact_id, phone, first_message_at, archived_at, managers(name), stages(code, name), lead_tags(tag), lead_products(products(code, name))")
         .order("created_at", { ascending: false })
     ]);
 
-    for (const result of [managerResult, stageResult, productResult, statusResult, religionResult, hookResult, audienceResult]) {
+    for (const result of [managerResult, stageResult, productResult, statusResult, religionResult, hookResult, currentInterestResult, audienceResult]) {
       if (result.error) throw result.error;
     }
 
@@ -73,6 +80,7 @@ export async function GET(request) {
       statuses: statusResult.data || [],
       religions: religionResult.data || [],
       hooks: hookResult.data || [],
+      currentInterests: currentInterestResult.data || [],
       audienceLeads: (audienceResult.data || []).map(toAudienceLead)
     });
   } catch (error) {

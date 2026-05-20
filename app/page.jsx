@@ -55,6 +55,11 @@ const hooks = [
   { id: "critice", name: "Critice" }
 ];
 
+const currentInterests = [
+  { id: "rugaciune", name: "Rugăciune" },
+  { id: "bibletoday", name: "BibleToday" }
+];
+
 function makeDefaultLeads() {
   return [
     {
@@ -187,7 +192,7 @@ export default function HomePage() {
   const [leads, setLeads] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [currentManager, setCurrentManager] = useState(null);
-  const [crmConfig, setCrmConfig] = useState({ managers, stages, products, statuses: leadStatuses, religions, hooks });
+  const [crmConfig, setCrmConfig] = useState({ managers, stages, products, statuses: leadStatuses, religions, hooks, currentInterests });
   const [dataSource, setDataSource] = useState("loading");
   const [loadError, setLoadError] = useState("");
   const [saveState, setSaveState] = useState("idle");
@@ -242,7 +247,7 @@ export default function HomePage() {
         const stored = window.localStorage.getItem("crm-next-leads") || window.localStorage.getItem("crm-leads");
         const initial = stored ? JSON.parse(stored).map(normalizeLead) : makeDefaultLeads();
         setLeads(initial);
-        setCrmConfig({ managers, stages, products, statuses: leadStatuses, religions, hooks });
+        setCrmConfig({ managers, stages, products, statuses: leadStatuses, religions, hooks, currentInterests });
         setDataSource("local");
         setLoadError("");
         return;
@@ -315,6 +320,7 @@ export default function HomePage() {
   const activeStatuses = (crmConfig.statuses || leadStatuses).filter((status) => status.active);
   const activeReligions = (crmConfig.religions || religions).filter((religion) => religion.active);
   const activeHooks = (crmConfig.hooks || hooks).filter((hook) => hook.active);
+  const activeCurrentInterests = (crmConfig.currentInterests || currentInterests).filter((interest) => interest.active);
 
   useEffect(() => {
     if (!loaded || selectedId) return;
@@ -544,6 +550,7 @@ export default function HomePage() {
       lead.stage = draft.stage;
       lead.tags = draft.tags.split(",").map((tag) => tag.trim()).filter(Boolean);
       lead.hook = draft.hook;
+      lead.currentInterest = draft.currentInterest;
       lead.products = selectedProducts;
       lead.customerEmail = draft.customerEmail.trim();
       lead.phone = draft.phone.trim();
@@ -754,7 +761,7 @@ export default function HomePage() {
           requiresFollowUp={modalSource === "inbox" && selectedLead.unread}
           requiresMetaLink={modalSource === "inbox" && selectedLead.unread && !selectedLead.metaUrlVerified}
           warning={warning}
-          config={{ managers: activeManagers, stages: activeStages, products: activeProducts, statuses: activeStatuses, religions: activeReligions, hooks: activeHooks }}
+          config={{ managers: activeManagers, stages: activeStages, products: activeProducts, statuses: activeStatuses, religions: activeReligions, hooks: activeHooks, currentInterests: activeCurrentInterests }}
           isAdmin={currentManager?.role === "admin"}
           lookups={{ managerForConfig, stageForConfig, productForConfig, statusForConfig }}
           onChange={setDraft}
@@ -951,7 +958,10 @@ function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning,
             <label>Prioritate<select value={draft.priority} onChange={(event) => update("priority", event.target.value)}><option value="normal">Normala</option><option value="high">Inalta</option><option value="low">Joasa</option></select></label>
           </div>
 
-          <label>Etapa / tag principal<select value={draft.stage} onChange={(event) => update("stage", event.target.value)}>{config.stages.map((stage) => <option key={stage.id} value={stage.id}>{stage.name}</option>)}</select></label>
+          <div className="field-grid">
+            <label>Etapa / tag principal<select value={draft.stage} onChange={(event) => update("stage", event.target.value)}>{config.stages.map((stage) => <option key={stage.id} value={stage.id}>{stage.name}</option>)}</select></label>
+            <label>Interes actual<select value={draft.currentInterest} onChange={(event) => update("currentInterest", event.target.value)}><option value="">Neindicat</option>{config.currentInterests.map((interest) => <option key={interest.id} value={interest.id}>{interest.name}</option>)}</select></label>
+          </div>
 
           <div className="field-grid">
             <label>Religie<select value={draft.tags} onChange={(event) => update("tags", event.target.value)}><option value="">Neindicat</option>{config.religions.map((religion) => <option key={religion.id} value={religion.name}>{religion.name}</option>)}</select></label>
@@ -1181,6 +1191,7 @@ function normalizeLead(lead) {
     priority: lead.priority || "normal",
     customerEmail: lead.customerEmail || "",
     stage: lead.stage || "new",
+    currentInterest: lead.currentInterest || "",
     createdAt: lead.createdAt || now,
     firstMessageAt: lead.firstMessageAt || lead.createdAt || now,
     processedCount: lead.processedCount || 0,
@@ -1200,6 +1211,7 @@ function makeEmptyManualLead() {
     priority: "normal",
     phone: "",
     hook: "",
+    currentInterest: "",
     tags: "",
     notes: ""
   };
@@ -1214,6 +1226,7 @@ function makeLeadDraft(lead) {
     stage: lead.stage || "new",
     tags: (lead.tags || []).join(", "),
     hook: lead.hook || "",
+    currentInterest: lead.currentInterest || "",
     metaUrl: lead.metaUrlVerified ? lead.metaUrl || "" : "",
     metaUrlVerified: Boolean(lead.metaUrlVerified),
     customerEmail: lead.customerEmail || "",
