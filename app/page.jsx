@@ -557,7 +557,9 @@ export default function HomePage() {
       lead.followDate = draft.followDate;
       lead.stage = draft.stage;
       lead.tags = draft.tags.split(",").map((tag) => tag.trim()).filter(Boolean);
-      lead.hook = draft.hook;
+      if (!lead.hook) {
+        lead.hook = draft.hook;
+      }
       lead.currentInterest = draft.currentInterest;
       lead.products = selectedProducts;
       lead.customerEmail = draft.customerEmail.trim();
@@ -988,7 +990,14 @@ function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning,
 
           <div className="field-grid">
             <label>Religie<select value={draft.tags} onChange={(event) => update("tags", event.target.value)}><option value="">Neindicat</option>{config.religions.map((religion) => <option key={religion.id} value={religion.name}>{religion.name}</option>)}</select></label>
-            <label>Hook<select value={draft.hook} onChange={(event) => update("hook", event.target.value)}><option value="">Neindicat</option>{config.hooks.map((hook) => <option key={hook.id} value={hook.id}>{hook.name}</option>)}</select></label>
+            <label className="locked-field">
+              Hook
+              <select value={lead.hook ? lead.hook : draft.hook} onChange={(event) => update("hook", event.target.value)} disabled={Boolean(lead.hook)}>
+                <option value="">Neindicat</option>
+                {config.hooks.map((hook) => <option key={hook.id} value={hook.id}>{hook.name}</option>)}
+              </select>
+              {lead.hook && <span>Hook-ul este sursa initiala a leadului si nu poate fi schimbat.</span>}
+            </label>
           </div>
 
           <label>Produs propus<select value={draft.products[0] || ""} onChange={(event) => update("products", event.target.value ? [event.target.value] : [])}><option value="">Niciun produs</option>{config.products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>

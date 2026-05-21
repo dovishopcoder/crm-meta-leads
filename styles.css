@@ -721,6 +721,18 @@ label textarea {
   resize: vertical;
 }
 
+.locked-field select:disabled {
+  background: #f4f7fb;
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.locked-field span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
 .modal-actions {
   justify-content: flex-end;
   gap: 10px;
