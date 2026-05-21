@@ -557,7 +557,7 @@ export default function HomePage() {
       lead.followDate = draft.followDate;
       lead.stage = draft.stage;
       lead.tags = draft.tags.split(",").map((tag) => tag.trim()).filter(Boolean);
-      if (!lead.hook) {
+      if (!lead.hook || currentManager?.role === "admin") {
         lead.hook = draft.hook;
       }
       lead.currentInterest = draft.currentInterest;
@@ -992,11 +992,10 @@ function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning,
             <label>Religie<select value={draft.tags} onChange={(event) => update("tags", event.target.value)}><option value="">Neindicat</option>{config.religions.map((religion) => <option key={religion.id} value={religion.name}>{religion.name}</option>)}</select></label>
             <label className="locked-field">
               Hook
-              <select value={lead.hook ? lead.hook : draft.hook} onChange={(event) => update("hook", event.target.value)} disabled={Boolean(lead.hook)}>
+              <select value={lead.hook && !isAdmin ? lead.hook : draft.hook} onChange={(event) => update("hook", event.target.value)} disabled={Boolean(lead.hook) && !isAdmin}>
                 <option value="">Neindicat</option>
                 {config.hooks.map((hook) => <option key={hook.id} value={hook.id}>{hook.name}</option>)}
               </select>
-              {lead.hook && <span>Hook-ul este sursa initiala a leadului si nu poate fi schimbat.</span>}
             </label>
           </div>
 
