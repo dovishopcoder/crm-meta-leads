@@ -999,20 +999,21 @@ function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning,
             <span>Ultima prelucrare: {lead.lastProcessedAt ? formatDateTime(lead.lastProcessedAt) : "-"}</span>
           </div>
 
-          <ClientHistory lead={lead} lookups={lookups} />
+          <CommentsPanel lead={lead} draft={draft} currentManager={currentManager} lookups={lookups} onChange={update} />
 
           <div className="field-grid">
             <label>Email client<input value={draft.customerEmail} onChange={(event) => update("customerEmail", event.target.value)} placeholder="email oferit de client" /></label>
             <label>Telefon / contact extra<input value={draft.phone} onChange={(event) => update("phone", event.target.value)} placeholder="+373..." /></label>
           </div>
           <label>Link Meta direct<input value={draft.metaUrl} onChange={(event) => update("metaUrl", event.target.value)} placeholder="https://business.facebook.com/latest/inbox/all?..." /></label>
-          <CommentsPanel lead={lead} draft={draft} currentManager={currentManager} lookups={lookups} onChange={update} />
           {warning && <p className="modal-warning">{warning}</p>}
 
           <div className="modal-actions">
             <button type="button" className="danger-btn" onClick={onArchive}>Arhiveaza</button>
             <button type="submit" className="primary-btn">Salveaza</button>
           </div>
+
+          <ClientHistory lead={lead} lookups={lookups} />
             </>
           )}
         </form>
@@ -1022,21 +1023,30 @@ function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning,
 }
 
 function ClientHistory({ lead, lookups }) {
+  const [open, setOpen] = useState(false);
   const items = buildClientHistory(lead, lookups);
 
   return (
-    <section className="modal-section">
-      <p className="eyebrow">Istoric client</p>
-      <div className="history-list">
-        {items.map((item, index) => (
-          <article key={`${item.at}-${index}`} className="history-item">
-            <span>{formatDateTime(item.at)}</span>
-            <strong>{item.title}</strong>
-            {item.detail && <p>{item.detail}</p>}
-          </article>
-        ))}
-        {!items.length && <p className="empty-history">Nu exista istoric pentru acest client.</p>}
-      </div>
+    <section className="modal-section history-section">
+      <button type="button" className="history-toggle" onClick={() => setOpen((value) => !value)}>
+        <span>
+          <span className="eyebrow">Istoric client</span>
+          <strong>{items.length} evenimente</strong>
+        </span>
+        <span>{open ? "Ascunde" : "Deschide"}</span>
+      </button>
+      {open && (
+        <div className="history-list">
+          {items.map((item, index) => (
+            <article key={`${item.at}-${index}`} className="history-item">
+              <span>{formatDateTime(item.at)}</span>
+              <strong>{item.title}</strong>
+              {item.detail && <p>{item.detail}</p>}
+            </article>
+          ))}
+          {!items.length && <p className="empty-history">Nu exista istoric pentru acest client.</p>}
+        </div>
+      )}
     </section>
   );
 }

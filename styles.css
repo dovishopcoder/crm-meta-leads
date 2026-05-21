@@ -796,6 +796,73 @@ label textarea {
   user-select: text;
 }
 
+.history-section {
+  padding: 0;
+  overflow: hidden;
+}
+
+.history-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 11px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+
+.history-toggle > span:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.history-toggle strong {
+  font-size: 15px;
+}
+
+.history-toggle > span:last-child {
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.history-list {
+  display: grid;
+  gap: 9px;
+  max-height: 320px;
+  overflow: auto;
+  padding: 0 12px 12px;
+}
+
+.history-item {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.history-item span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.history-item strong {
+  display: block;
+  margin-top: 4px;
+}
+
+.history-item p,
+.empty-history {
+  margin: 5px 0 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
 .ghost-btn,
 .danger-btn,
 .primary-btn {
