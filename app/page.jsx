@@ -768,7 +768,7 @@ export default function HomePage() {
                 </header>
                 <div className="day-events">
                   {events.map((lead) => (
-                    <EventCard key={lead.id} lead={lead} lookups={{ managerForConfig, stageForConfig, productForConfig, statusForConfig }} onOpen={() => openLead(lead, "calendar")} onDragStart={(event) => event.dataTransfer.setData("text/plain", lead.id)} />
+                    <EventCard key={lead.id} lead={lead} lookups={{ managerForConfig, stageForConfig, productForConfig, currentInterestForConfig }} onOpen={() => openLead(lead, "calendar")} onDragStart={(event) => event.dataTransfer.setData("text/plain", lead.id)} />
                   ))}
                   {!events.length && <p className="empty-day">Liber pentru follow-up</p>}
                 </div>
@@ -842,16 +842,17 @@ function LeadCard({ lead, lookups, onOpen, onDragStart }) {
 }
 
 function EventCard({ lead, lookups, onOpen, onDragStart }) {
-  const { managerForConfig, stageForConfig, productForConfig, statusForConfig } = lookups;
+  const { managerForConfig, stageForConfig, productForConfig, currentInterestForConfig } = lookups;
   const manager = managerForConfig(lead.managerId);
   const isAssigned = lead.managerId && lead.managerId !== "unassigned";
+  const currentInterest = lead.currentInterest ? currentInterestForConfig(lead.currentInterest).name : "Interes neindicat";
   return (
     <article className={`event-card ${lead.platform} ${lead.priority === "high" ? "priority-high" : ""}`} draggable onDragStart={onDragStart}>
       <div className="event-card-head">
         <Avatar lead={lead} className="event-avatar" />
         <div className="event-title">
           <strong>{lead.name}</strong>
-          <span>{statusForConfig(lead.status).name}</span>
+          <span>{currentInterest}</span>
         </div>
       </div>
       {lead.unread && <div className="event-badges"><span className="status-pill unread-pill">Mesaj nou</span></div>}
