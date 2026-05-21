@@ -58,7 +58,7 @@ export async function GET(request) {
     const [managerResult, stageResult, productResult, statusResult, religionResult, hookResult, currentInterestResult, audienceResult] = await Promise.all([
       supabase.from("managers").select("id, name, email, role, color, active, created_at").order("created_at", { ascending: true }),
       supabase.from("stages").select("id, code, name, position, active, created_at").order("position", { ascending: true }),
-      supabase.from("products").select("id, code, name, active, created_at").order("created_at", { ascending: true }),
+      loadProductRows(supabase),
       loadOptionRows(supabase, "lead_statuses", DEFAULT_STATUSES),
       loadOptionRows(supabase, "religions", DEFAULT_RELIGIONS),
       loadOptionRows(supabase, "hook_options", DEFAULT_HOOKS),
@@ -101,8 +101,17 @@ export async function POST(request) {
     if (!payload.code || !payload.name) {
       return NextResponse.json({ error: "Completeaza codul si numele." }, { status: 400 });
     }
+    if (payload.position === undefined) {
+      payload.position = await nextPosition(supabase, table);
+    }
 
-    const { data, error } = await supabase.from(table).insert(payload).select("*").single();
+    let { data, error } = await supabase.from(table).insert(payload).select("*").single();
+    if (error && isMissingPositionError(error) && "position" in payload) {
+      delete payload.position;
+      const retry = await supabase.from(table).insert(payload).select("*").single();
+      data = retry.data;
+      error = retry.error;
+    }
     if (error) throw error;
     return NextResponse.json({ ok: true, data });
   } catch (error) {
@@ -118,14 +127,27 @@ export async function PATCH(request) {
     const type = String(body.type || "").trim();
     const table = TABLES[type];
     const id = String(body.id || "").trim();
-    if (!table || !id) return NextResponse.json({ error: "Setarea lipseste." }, { status: 400 });
+    if (!table) return NextResponse.json({ error: "Setarea lipseste." }, { status: 400 });
+
+    if (Array.isArray(body.order)) {
+      await updateOrder(supabase, table, body.order);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (!id) return NextResponse.json({ error: "Setarea lipseste." }, { status: 400 });
 
     const payload = buildPayload(type, body);
     if (!payload.code || !payload.name) {
       return NextResponse.json({ error: "Completeaza codul si numele." }, { status: 400 });
     }
 
-    const { data, error } = await supabase.from(table).update(payload).eq("id", id).select("*").single();
+    let { data, error } = await supabase.from(table).update(payload).eq("id", id).select("*").single();
+    if (error && isMissingPositionError(error) && "position" in payload) {
+      delete payload.position;
+      const retry = await supabase.from(table).update(payload).eq("id", id).select("*").single();
+      data = retry.data;
+      error = retry.error;
+    }
     if (error) throw error;
     return NextResponse.json({ ok: true, data });
   } catch (error) {
@@ -182,11 +204,58 @@ function buildPayload(type, body) {
     active: body.active !== false
   };
 
-  if (type !== "product") {
+  if (body.position !== undefined) {
     payload.position = Number(body.position) || 0;
   }
 
   return payload;
+}
+
+async function nextPosition(supabase, table) {
+  const result = await supabase
+    .from(table)
+    .select("position")
+    .order("position", { ascending: false })
+    .limit(1);
+
+  if (result.error) {
+    if (isMissingPositionError(result.error)) return undefined;
+    throw result.error;
+  }
+  return Number(result.data?.[0]?.position || 0) + 1;
+}
+
+async function updateOrder(supabase, table, order) {
+  for (const item of order) {
+    const id = String(item.id || "").trim();
+    if (!id) continue;
+    const { error } = await supabase
+      .from(table)
+      .update({ position: Number(item.position) || 0 })
+      .eq("id", id);
+    if (error) throw error;
+  }
+}
+
+async function loadProductRows(supabase) {
+  const result = await supabase
+    .from("products")
+    .select("id, code, name, position, active, created_at")
+    .order("position", { ascending: true });
+
+  if (!result.error) return result;
+  if (!isMissingPositionError(result.error)) return result;
+
+  const fallback = await supabase
+    .from("products")
+    .select("id, code, name, active, created_at")
+    .order("created_at", { ascending: true });
+
+  if (fallback.error) return fallback;
+  return {
+    data: (fallback.data || []).map((product, index) => ({ ...product, position: index + 1 })),
+    error: null
+  };
 }
 
 async function loadOptionRows(supabase, table, fallbackRows) {
@@ -226,6 +295,10 @@ function toAudienceLead(row) {
 
 function isMissingTableError(error) {
   return error?.code === "42P01" || /schema cache|does not exist|Could not find the table/i.test(error?.message || "");
+}
+
+function isMissingPositionError(error) {
+  return error?.code === "PGRST204" || /position|schema cache/i.test(error?.message || "");
 }
 
 function getBearerToken(request) {

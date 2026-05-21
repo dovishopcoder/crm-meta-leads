@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AppNav } from "../components";
-import { countActiveLeadsForManager, createCurrentInterest, createHook, createLeadStatus, createManager, createProduct, createReligion, createStage, deleteAdminSetting, deleteManager, getCurrentSession, loadAdminData, loadCurrentManager, resetManagerPassword, transferActiveLeads, updateCurrentInterest, updateHook, updateLeadStatus, updateManager, updateProduct, updateReligion, updateStage } from "../supabase-crm";
+import { countActiveLeadsForManager, createCurrentInterest, createHook, createLeadStatus, createManager, createProduct, createReligion, createStage, deleteAdminSetting, deleteManager, getCurrentSession, loadAdminData, loadCurrentManager, reorderAdminSettings, resetManagerPassword, transferActiveLeads, updateCurrentInterest, updateHook, updateLeadStatus, updateManager, updateProduct, updateReligion, updateStage } from "../supabase-crm";
 
 export default function AdminPage() {
   const [currentManager, setCurrentManager] = useState(null);
@@ -21,6 +21,7 @@ export default function AdminPage() {
   const [editForm, setEditForm] = useState({});
   const [passwordDrafts, setPasswordDrafts] = useState({});
   const [transferPrompt, setTransferPrompt] = useState(null);
+  const [draggedSetting, setDraggedSetting] = useState(null);
   const [audienceFilters, setAudienceFilters] = useState({ stage: "all", manager: "all", product: "all", status: "active" });
 
   useEffect(() => {
@@ -118,7 +119,7 @@ export default function AdminPage() {
     if (!row?.id) return;
     setAdminData((current) => ({
       ...current,
-      [key]: [...(current[key] || []).filter((item) => item.id !== row.id), row]
+      [key]: [...(current[key] || []).filter((item) => item.id !== row.id), row].sort((left, right) => Number(left.position || 0) - Number(right.position || 0))
     }));
   }
 
@@ -230,6 +231,25 @@ export default function AdminPage() {
     setPasswordDrafts((drafts) => ({ ...drafts, [manager.id]: "" }));
   }
 
+  async function handleReorderSetting(type, targetRow) {
+    if (!draggedSetting || draggedSetting.type !== type || draggedSetting.id === targetRow.id) return;
+
+    const key = settingKeyForType(type);
+    const rows = adminData[key] || [];
+    const fromIndex = rows.findIndex((row) => row.id === draggedSetting.id);
+    const toIndex = rows.findIndex((row) => row.id === targetRow.id);
+    if (fromIndex < 0 || toIndex < 0) return;
+
+    const nextRows = [...rows];
+    const [moved] = nextRows.splice(fromIndex, 1);
+    nextRows.splice(toIndex, 0, moved);
+    const withPositions = nextRows.map((row, index) => ({ ...row, position: index + 1 }));
+
+    setDraggedSetting(null);
+    setAdminData((current) => ({ ...current, [key]: withPositions }));
+    await submitAdminAction(() => reorderAdminSettings(type, withPositions), "Ordinea a fost actualizata.", { refresh: false });
+  }
+
   if (!loaded) return null;
 
   return (
@@ -308,12 +328,11 @@ export default function AdminPage() {
           <form className="admin-form" onSubmit={handleCreateStatus}>
             <input value={statusForm.code} onChange={(event) => setStatusForm({ ...statusForm, code: slugifyInput(event.target.value) })} placeholder="cod-status" required />
             <input value={statusForm.name} onChange={(event) => setStatusForm({ ...statusForm, name: event.target.value })} placeholder="Nume status" required />
-            <input type="number" value={statusForm.position} onChange={(event) => setStatusForm({ ...statusForm, position: event.target.value })} placeholder="Pozitie" required />
             <button className="primary-btn" type="submit">Adauga</button>
           </form>
           <AdminTable
             title="Status lead"
-            columns={["Cod", "Nume", "Pozitie", "Activ"]}
+            columns={["Cod", "Nume", "Activ"]}
             rows={adminData.statuses}
             type="status"
             editing={editing}
@@ -323,6 +342,9 @@ export default function AdminPage() {
             onSave={saveEdit}
             onCancel={cancelEdit}
             onDelete={handleDeleteSetting}
+            draggedSetting={draggedSetting}
+            onDragStart={setDraggedSetting}
+            onDropRow={handleReorderSetting}
           />
         </section>
 
@@ -331,12 +353,11 @@ export default function AdminPage() {
           <form className="admin-form" onSubmit={handleCreateHook}>
             <input value={hookForm.code} onChange={(event) => setHookForm({ ...hookForm, code: slugifyInput(event.target.value) })} placeholder="cod-hook" required />
             <input value={hookForm.name} onChange={(event) => setHookForm({ ...hookForm, name: event.target.value })} placeholder="Nume hook" required />
-            <input type="number" value={hookForm.position} onChange={(event) => setHookForm({ ...hookForm, position: event.target.value })} placeholder="Pozitie" required />
             <button className="primary-btn" type="submit">Adauga</button>
           </form>
           <AdminTable
             title="Hook-uri"
-            columns={["Cod", "Nume", "Pozitie", "Activ"]}
+            columns={["Cod", "Nume", "Activ"]}
             rows={adminData.hooks}
             type="hook"
             editing={editing}
@@ -346,6 +367,9 @@ export default function AdminPage() {
             onSave={saveEdit}
             onCancel={cancelEdit}
             onDelete={handleDeleteSetting}
+            draggedSetting={draggedSetting}
+            onDragStart={setDraggedSetting}
+            onDropRow={handleReorderSetting}
           />
         </section>
 
@@ -354,12 +378,11 @@ export default function AdminPage() {
           <form className="admin-form" onSubmit={handleCreateCurrentInterest}>
             <input value={currentInterestForm.code} onChange={(event) => setCurrentInterestForm({ ...currentInterestForm, code: slugifyInput(event.target.value) })} placeholder="cod-interes" required />
             <input value={currentInterestForm.name} onChange={(event) => setCurrentInterestForm({ ...currentInterestForm, name: event.target.value })} placeholder="Nume interes" required />
-            <input type="number" value={currentInterestForm.position} onChange={(event) => setCurrentInterestForm({ ...currentInterestForm, position: event.target.value })} placeholder="Pozitie" required />
             <button className="primary-btn" type="submit">Adauga</button>
           </form>
           <AdminTable
             title="Interes actual"
-            columns={["Cod", "Nume", "Pozitie", "Activ"]}
+            columns={["Cod", "Nume", "Activ"]}
             rows={adminData.currentInterests}
             type="currentInterest"
             editing={editing}
@@ -369,6 +392,9 @@ export default function AdminPage() {
             onSave={saveEdit}
             onCancel={cancelEdit}
             onDelete={handleDeleteSetting}
+            draggedSetting={draggedSetting}
+            onDragStart={setDraggedSetting}
+            onDropRow={handleReorderSetting}
           />
         </section>
 
@@ -377,12 +403,11 @@ export default function AdminPage() {
           <form className="admin-form" onSubmit={handleCreateReligion}>
             <input value={religionForm.code} onChange={(event) => setReligionForm({ ...religionForm, code: slugifyInput(event.target.value) })} placeholder="cod-religie" required />
             <input value={religionForm.name} onChange={(event) => setReligionForm({ ...religionForm, name: event.target.value })} placeholder="Nume religie" required />
-            <input type="number" value={religionForm.position} onChange={(event) => setReligionForm({ ...religionForm, position: event.target.value })} placeholder="Pozitie" required />
             <button className="primary-btn" type="submit">Adauga</button>
           </form>
           <AdminTable
             title="Religii"
-            columns={["Cod", "Nume", "Pozitie", "Activa"]}
+            columns={["Cod", "Nume", "Activa"]}
             rows={adminData.religions}
             type="religion"
             editing={editing}
@@ -392,6 +417,9 @@ export default function AdminPage() {
             onSave={saveEdit}
             onCancel={cancelEdit}
             onDelete={handleDeleteSetting}
+            draggedSetting={draggedSetting}
+            onDragStart={setDraggedSetting}
+            onDropRow={handleReorderSetting}
           />
         </section>
 
@@ -400,12 +428,11 @@ export default function AdminPage() {
           <form className="admin-form" onSubmit={handleCreateStage}>
             <input value={stageForm.code} onChange={(event) => setStageForm({ ...stageForm, code: slugifyInput(event.target.value) })} placeholder="cod-etapa" required />
             <input value={stageForm.name} onChange={(event) => setStageForm({ ...stageForm, name: event.target.value })} placeholder="Nume etapa" required />
-            <input type="number" value={stageForm.position} onChange={(event) => setStageForm({ ...stageForm, position: event.target.value })} placeholder="Pozitie" required />
             <button className="primary-btn" type="submit">Adauga</button>
           </form>
           <AdminTable
             title="Etape / palnie"
-            columns={["Cod", "Nume", "Pozitie", "Activa"]}
+            columns={["Cod", "Nume", "Activa"]}
             rows={adminData.stages}
             type="stage"
             editing={editing}
@@ -415,6 +442,9 @@ export default function AdminPage() {
             onSave={saveEdit}
             onCancel={cancelEdit}
             onDelete={handleDeleteSetting}
+            draggedSetting={draggedSetting}
+            onDragStart={setDraggedSetting}
+            onDropRow={handleReorderSetting}
           />
         </section>
 
@@ -437,6 +467,9 @@ export default function AdminPage() {
             onSave={saveEdit}
             onCancel={cancelEdit}
             onDelete={handleDeleteSetting}
+            draggedSetting={draggedSetting}
+            onDragStart={setDraggedSetting}
+            onDropRow={handleReorderSetting}
           />
         </section>
       </div>
@@ -458,19 +491,45 @@ function slugifyInput(value) {
   return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
-function AdminTable({ title, columns, rows, type, editing, editForm, onEdit, onEditForm, onSave, onCancel, onDelete, onPasswordChange, onPasswordReset, passwordDrafts = {}, currentManagerId }) {
+function settingKeyForType(type) {
+  return {
+    stage: "stages",
+    product: "products",
+    status: "statuses",
+    religion: "religions",
+    hook: "hooks",
+    currentInterest: "currentInterests"
+  }[type];
+}
+
+function AdminTable({ title, columns, rows, type, editing, editForm, onEdit, onEditForm, onSave, onCancel, onDelete, onPasswordChange, onPasswordReset, passwordDrafts = {}, currentManagerId, draggedSetting, onDragStart, onDropRow }) {
+  const canReorder = type !== "manager";
+
   return (
     <section className="stats-table-card admin-card">
       <h3>{title}</h3>
       <table className="archive-table compact-table">
         <thead>
-          <tr>{columns.map((column) => <th key={column}>{column}</th>)}<th>Actiuni</th></tr>
+          <tr>{canReorder && <th>Ordine</th>}{columns.map((column) => <th key={column}>{column}</th>)}<th>Actiuni</th></tr>
         </thead>
         <tbody>
           {rows.map((row) => {
             const isEditing = editing?.type === type && editing.id === row.id;
+            const isDragging = draggedSetting?.type === type && draggedSetting.id === row.id;
             return (
-              <tr key={row.id}>
+              <tr
+                key={row.id}
+                className={isDragging ? "drag-row-active" : ""}
+                draggable={canReorder}
+                onDragStart={(event) => {
+                  if (!canReorder) return;
+                  event.dataTransfer.setData("text/plain", row.id);
+                  onDragStart?.({ type, id: row.id });
+                }}
+                onDragOver={(event) => canReorder && event.preventDefault()}
+                onDrop={() => canReorder && onDropRow?.(type, row)}
+              >
+                {canReorder && <td><span className="drag-handle" title="Trage pentru a schimba ordinea">drag</span></td>}
                 {isEditing ? (
                   <EditableCells type={type} form={editForm} onChange={onEditForm} />
                 ) : (
@@ -507,7 +566,7 @@ function AdminTable({ title, columns, rows, type, editing, editForm, onEdit, onE
               </tr>
             );
           })}
-          {!rows.length && <tr><td className="archive-empty" colSpan={columns.length + 1}>Nu exista date.</td></tr>}
+          {!rows.length && <tr><td className="archive-empty" colSpan={columns.length + (canReorder ? 2 : 1)}>Nu exista date.</td></tr>}
         </tbody>
       </table>
     </section>
@@ -613,7 +672,6 @@ function ReadOnlyCells({ type, row }) {
       <>
         <td>{row.code}</td>
         <td>{row.name}</td>
-        <td>{row.position}</td>
         <td>{row.active ? "Da" : "Nu"}</td>
       </>
     );
@@ -649,7 +707,6 @@ function EditableCells({ type, form, onChange }) {
       <>
         <td><input className="table-input" value={form.code || ""} onChange={(event) => update("code", slugifyInput(event.target.value))} /></td>
         <td><input className="table-input" value={form.name || ""} onChange={(event) => update("name", event.target.value)} /></td>
-        <td><input className="table-input" type="number" value={form.position || ""} onChange={(event) => update("position", event.target.value)} /></td>
         <td><select className="table-input" value={String(Boolean(form.active))} onChange={(event) => update("active", event.target.value === "true")}><option value="true">Da</option><option value="false">Nu</option></select></td>
       </>
     );

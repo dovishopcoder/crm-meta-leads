@@ -129,6 +129,7 @@ export async function loadCrmConfig() {
       id: product.code,
       uuid: product.id,
       name: product.name,
+      position: product.position,
       active: product.active
     })),
     statuses: data.statuses.map((status) => ({
@@ -224,28 +225,28 @@ export async function resetManagerPassword(managerId, password) {
   if (!response.ok) throw new Error(payload.error || "Nu s-a putut schimba parola.");
 }
 
-export async function createStage({ code, name, position }) {
-  return saveAdminSetting("POST", { type: "stage", code, name, position, active: true });
+export async function createStage({ code, name }) {
+  return saveAdminSetting("POST", { type: "stage", code, name, active: true });
 }
 
 export async function createProduct({ code, name }) {
   return saveAdminSetting("POST", { type: "product", code, name, active: true });
 }
 
-export async function createLeadStatus({ code, name, position }) {
-  return saveAdminSetting("POST", { type: "status", code, name, position, active: true });
+export async function createLeadStatus({ code, name }) {
+  return saveAdminSetting("POST", { type: "status", code, name, active: true });
 }
 
-export async function createReligion({ code, name, position }) {
-  return saveAdminSetting("POST", { type: "religion", code, name, position, active: true });
+export async function createReligion({ code, name }) {
+  return saveAdminSetting("POST", { type: "religion", code, name, active: true });
 }
 
-export async function createHook({ code, name, position }) {
-  return saveAdminSetting("POST", { type: "hook", code, name, position, active: true });
+export async function createHook({ code, name }) {
+  return saveAdminSetting("POST", { type: "hook", code, name, active: true });
 }
 
-export async function createCurrentInterest({ code, name, position }) {
-  return saveAdminSetting("POST", { type: "currentInterest", code, name, position, active: true });
+export async function createCurrentInterest({ code, name }) {
+  return saveAdminSetting("POST", { type: "currentInterest", code, name, active: true });
 }
 
 export async function updateManager(id, { name, email, role, color, active }) {
@@ -281,8 +282,8 @@ export async function updateStage(id, { code, name, position, active }) {
   return saveAdminSetting("PATCH", { id, type: "stage", code, name, position, active });
 }
 
-export async function updateProduct(id, { code, name, active }) {
-  return saveAdminSetting("PATCH", { id, type: "product", code, name, active });
+export async function updateProduct(id, { code, name, position, active }) {
+  return saveAdminSetting("PATCH", { id, type: "product", code, name, position, active });
 }
 
 export async function updateLeadStatus(id, { code, name, position, active }) {
@@ -303,6 +304,13 @@ export async function updateCurrentInterest(id, { code, name, position, active }
 
 export async function deleteAdminSetting(type, id) {
   return saveAdminSetting("DELETE", { id, type });
+}
+
+export async function reorderAdminSettings(type, rows) {
+  return saveAdminSetting("PATCH", {
+    type,
+    order: rows.map((row, index) => ({ id: row.id, position: index + 1 }))
+  });
 }
 
 async function saveAdminSetting(method, body) {
