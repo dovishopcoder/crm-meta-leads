@@ -341,7 +341,7 @@ export async function loadSupabaseLeads() {
   const refs = await ensureReferenceData();
   let { data, error } = await supabase
     .from("leads")
-    .select("*, lead_tags(tag), lead_products(status, proposed_at, product_id, products(code, name)), lead_interest_history(interest_code, changed_at, manager_id), lead_comments(comment, manager_id, created_at)")
+    .select("*, lead_tags(tag), lead_products(status, proposed_at, product_id, products(code, name)), lead_stage_history(from_stage_id, to_stage_id, manager_id, changed_at), lead_interest_history(interest_code, changed_at, manager_id), lead_comments(comment, manager_id, created_at)")
     .order("created_at", { ascending: true });
 
   if (error && isMissingTableError(error)) {
@@ -421,6 +421,7 @@ export async function saveSupabaseLead(lead, options = {}) {
 
   await saveLeadTags(savedId, lead.tags || []);
   await saveLeadProducts(savedId, lead.products || [], refs);
+  await saveLeadStageHistory(savedId, lead.tagHistory || [], refs);
   await saveLeadInterestHistory(savedId, lead.currentInterestHistory || [], refs);
   await saveLeadComments(savedId, lead.comments || [], refs);
   return { ...lead, id: savedId, metaContactId: leadRow.meta_contact_id };
@@ -542,7 +543,12 @@ function fromSupabaseLead(row, refs) {
     lastMessageAt: row.last_message_at,
     processedCount: row.processed_count || 0,
     lastProcessedAt: row.last_processed_at || "",
-    tagHistory: [],
+    tagHistory: (row.lead_stage_history || []).map((entry) => ({
+      from: refs.stageUuidToCode[entry.from_stage_id] || "",
+      to: refs.stageUuidToCode[entry.to_stage_id] || "",
+      changedAt: entry.changed_at,
+      managerId: refs.managerUuidToCode[entry.manager_id] || "unassigned"
+    })),
     currentInterestHistory: (row.lead_interest_history || []).map((entry) => ({
       interest: entry.interest_code,
       changedAt: entry.changed_at,
@@ -612,6 +618,32 @@ async function saveLeadProducts(leadId, selectedProducts, refs) {
   if (!rows.length) return;
   const { error } = await supabase.from("lead_products").insert(rows);
   if (error) throw error;
+}
+
+async function saveLeadStageHistory(leadId, history, refs) {
+  const deleteResult = await supabase.from("lead_stage_history").delete().eq("lead_id", leadId);
+  if (deleteResult.error) {
+    if (isMissingTableError(deleteResult.error)) return;
+    throw deleteResult.error;
+  }
+
+  const rows = history
+    .filter((entry) => entry.to)
+    .map((entry) => ({
+      lead_id: leadId,
+      from_stage_id: refs.stageCodeToUuid[entry.from] || null,
+      to_stage_id: refs.stageCodeToUuid[entry.to] || null,
+      manager_id: refs.managerCodeToUuid[entry.managerId] || null,
+      changed_at: entry.changedAt || new Date().toISOString()
+    }))
+    .filter((row) => row.to_stage_id);
+
+  if (!rows.length) return;
+  const { error } = await supabase.from("lead_stage_history").insert(rows);
+  if (error) {
+    if (isMissingTableError(error)) return;
+    throw error;
+  }
 }
 
 async function saveLeadInterestHistory(leadId, history, refs) {

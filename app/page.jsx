@@ -1106,7 +1106,7 @@ function buildClientHistory(lead, lookups) {
     items.push({
       at: entry.changedAt,
       title: "Etapa schimbata",
-      detail: `${lookups.stageForConfig(entry.from).name} -> ${lookups.stageForConfig(entry.to).name}`
+      detail: `${entry.from ? lookups.stageForConfig(entry.from).name : "Fara etapa"} -> ${lookups.stageForConfig(entry.to).name}`
     });
   });
 
