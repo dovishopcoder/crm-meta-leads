@@ -7,6 +7,7 @@ import { getCurrentSession, loadCrmConfig, loadCurrentManager, loadSupabaseLeads
 const DAY_MS = 24 * 60 * 60 * 1000;
 const FALLBACK_MANAGER_ID = "diana";
 const PENDING_INBOX_LEAD_KEY = "crm-pending-inbox-lead";
+const FOLLOW_TIME_OPTIONS = makeFollowTimeOptions();
 
 const managers = [
   { id: "unassigned", name: "Neatribuit", color: "#8a97aa" },
@@ -550,7 +551,7 @@ export default function HomePage() {
         return lead;
       }
 
-      const nextFollowDate = normalizeFollowInput(draft.followDate);
+      const nextFollowDate = normalizeFollowInput(draft.followDate, draft.followTime);
       lead.status = nextFollowDate ? "scheduled" : draft.status;
       lead.unread = false;
       lead.managerId = draft.managerId;
@@ -986,7 +987,11 @@ function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning,
           </div>
 
           <div className="field-grid">
-            <label>Urmatorul mesaj<input value={draft.followDate} onChange={(event) => update("followDate", event.target.value)} type="datetime-local" /></label>
+            <label>Data follow-up<input value={draft.followDate} onChange={(event) => update("followDate", event.target.value)} type="date" /></label>
+            <label>Ora follow-up<select value={draft.followTime} onChange={(event) => update("followTime", event.target.value)}><option value="">Fara ora</option>{FOLLOW_TIME_OPTIONS.map((time) => <option key={time} value={time}>{time}</option>)}</select></label>
+          </div>
+
+          <div className="field-grid">
             <label>Prioritate<select value={draft.priority} onChange={(event) => update("priority", event.target.value)}><option value="normal">Normala</option><option value="high">Inalta</option><option value="low">Joasa</option></select></label>
           </div>
 
@@ -1331,7 +1336,8 @@ function makeLeadDraft(lead) {
     status: lead.status,
     managerId: lead.managerId || "unassigned",
     priority: lead.priority || "normal",
-    followDate: followInputValue(lead.followDate),
+    followDate: followDateInputValue(lead.followDate),
+    followTime: followTimeInputValue(lead.followDate),
     stage: lead.stage || "new",
     tags: (lead.tags || []).join(", "),
     hook: lead.hook || "",
@@ -1461,20 +1467,25 @@ function followDateSortValue(value) {
   return parseFollowDate(value)?.getTime() || 0;
 }
 
-function followInputValue(value) {
+function followDateInputValue(value) {
   if (!value) return "";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return `${value}T09:00`;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
   const date = parseFollowDate(value);
   if (!date) return "";
-  return `${toDateKey(date)}T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  return toDateKey(date);
 }
 
-function normalizeFollowInput(value) {
-  if (!value) return "";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return new Date(`${value}T09:00`).toISOString();
-  }
-  const date = new Date(value);
+function followTimeInputValue(value) {
+  if (!hasExplicitFollowTime(value)) return "";
+  const date = parseFollowDate(value);
+  if (!date) return "";
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function normalizeFollowInput(dateValue, timeValue = "") {
+  if (!dateValue) return "";
+  if (!timeValue) return dateValue;
+  const date = new Date(`${dateValue}T${timeValue}`);
   return Number.isNaN(date.getTime()) ? "" : date.toISOString();
 }
 
@@ -1541,6 +1552,16 @@ function formatFollowTime(value) {
 
 function hasExplicitFollowTime(value) {
   return Boolean(value && !/^\d{4}-\d{2}-\d{2}$/.test(value));
+}
+
+function makeFollowTimeOptions() {
+  const options = [];
+  for (let hour = 0; hour < 24; hour += 1) {
+    for (let minute = 0; minute < 60; minute += 5) {
+      options.push(`${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`);
+    }
+  }
+  return options;
 }
 
 function formatLongDate(date) {
