@@ -1479,6 +1479,7 @@ function normalizeFollowInput(value) {
 }
 
 function moveFollowDateToDay(value, dateKey) {
+  if (!hasExplicitFollowTime(value)) return dateKey;
   const existing = parseFollowDate(value);
   const hours = existing ? existing.getHours() : 9;
   const minutes = existing ? existing.getMinutes() : 0;
@@ -1525,13 +1526,21 @@ function formatShortDate(date) {
 function formatFollowDateTime(value) {
   const date = parseFollowDate(value);
   if (!date) return "-";
-  return new Intl.DateTimeFormat("ro-RO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(date);
+  const options = hasExplicitFollowTime(value)
+    ? { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }
+    : { day: "numeric", month: "short" };
+  return new Intl.DateTimeFormat("ro-RO", options).format(date);
 }
 
 function formatFollowTime(value) {
+  if (!hasExplicitFollowTime(value)) return "";
   const date = parseFollowDate(value);
   if (!date) return "";
   return new Intl.DateTimeFormat("ro-RO", { hour: "2-digit", minute: "2-digit" }).format(date);
+}
+
+function hasExplicitFollowTime(value) {
+  return Boolean(value && !/^\d{4}-\d{2}-\d{2}$/.test(value));
 }
 
 function formatLongDate(date) {
