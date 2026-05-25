@@ -510,10 +510,6 @@ export default function HomePage() {
 
   function closeModal() {
     if (!selectedLead || !draft) return;
-    if (modalSource === "inbox" && selectedLead.unread && !selectedLead.metaUrlVerified) {
-      setWarning("Salveaza linkul direct din Meta inainte de a inchide acest lead.");
-      return;
-    }
     if (!canCloseSelected()) return;
     if (modalSource === "inbox" && selectedLead.unread) {
       saveSelectedLead();
@@ -527,7 +523,6 @@ export default function HomePage() {
   function canCloseSelected() {
     if (!selectedLead || !draft) return true;
     if (modalSource !== "inbox" || !selectedLead.unread) return true;
-    if (!selectedLead.metaUrlVerified && !draft.metaUrlVerified) return true;
     if (isTodayOrFutureFollowDate(draft.followDate)) return true;
     setWarning("Alege data si ora de follow-up pentru azi sau viitor, apoi apasa Salveaza. Un mesaj deschis din necitite nu poate fi inchis fara urmatorul pas.");
     return false;
@@ -807,7 +802,6 @@ export default function HomePage() {
           lead={selectedLead}
           draft={draft}
           requiresFollowUp={modalSource === "inbox" && selectedLead.unread}
-          requiresMetaLink={modalSource === "inbox" && selectedLead.unread && !selectedLead.metaUrlVerified}
           warning={warning}
           config={{ managers: activeManagers, stages: activeStages, products: activeProducts, statuses: activeStatuses, religions: activeReligions, hooks: activeHooks, currentInterests: activeCurrentInterests }}
           isAdmin={currentManager?.role === "admin"}
@@ -961,10 +955,12 @@ function ManualLeadModal({ draft, error, managers, hooks, onChange, onClose, onS
   );
 }
 
-function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning, config, isAdmin, lookups, currentManager, onChange, onClose, onArchive, onSave, onSendMessage }) {
+function ClientModal({ lead, draft, requiresFollowUp, warning, config, isAdmin, lookups, currentManager, onChange, onClose, onArchive, onSave, onSendMessage }) {
+  const [activeTab, setActiveTab] = useState("details");
   const [messageDraft, setMessageDraft] = useState("");
   const [messageState, setMessageState] = useState("idle");
   const [messageError, setMessageError] = useState("");
+  const hasMetaLink = Boolean(lead.metaUrlVerified && lead.metaUrl && lead.metaUrl !== "#");
 
   function update(field, value) {
     onChange({ ...draft, [field]: value });
@@ -976,11 +972,6 @@ function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning,
 
   function updateFollowMinute(value) {
     onChange({ ...draft, followMinute: value });
-  }
-
-  function saveMetaLinkOnly() {
-    if (!draft.metaUrl.trim()) return;
-    onSave({ metaLinkOnly: true, keepOpen: true });
   }
 
   async function submitMessage(event) {
@@ -1011,8 +1002,13 @@ function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning,
             <div>
               <p className="eyebrow">{platformLabel(lead.platform)}</p>
               <h3>{lead.name}</h3>
-              <a className="meta-open-btn" href={lead.metaUrl} target="_blank" rel="noreferrer">Deschide in Meta Business Suite</a>
+              {hasMetaLink && <a className="meta-open-btn" href={lead.metaUrl} target="_blank" rel="noreferrer">Deschide in Meta Business Suite</a>}
             </div>
+          </div>
+
+          <div className="modal-tabs" role="tablist" aria-label="Client">
+            <button type="button" className={activeTab === "details" ? "active" : ""} onClick={() => setActiveTab("details")}>Detalii</button>
+            <button type="button" className={activeTab === "conversation" ? "active" : ""} onClick={() => setActiveTab("conversation")}>Conversatie</button>
           </div>
 
           {requiresFollowUp && (
@@ -1020,20 +1016,10 @@ function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning,
               Mesaj deschis din necitite. Alege data si ora de follow-up pentru azi sau viitor inainte de inchidere.
             </div>
           )}
+          {warning && <p className="modal-warning">{warning}</p>}
 
-          {requiresMetaLink ? (
-            <div className="modal-section link-first-panel">
-              <p className="eyebrow">Primul pas</p>
-              <h3>Seteaza linkul direct din Meta</h3>
-              <label>Link Meta direct<input value={draft.metaUrl} onChange={(event) => update("metaUrl", event.target.value)} placeholder="Lipeste linkul copiat din Meta Business Suite" /></label>
-              <div className="modal-actions">
-                <button type="button" className="ghost-btn" onClick={onClose}>Inchide</button>
-                <button type="button" className="primary-btn" onClick={saveMetaLinkOnly} disabled={!draft.metaUrl.trim()}>Salveaza linkul</button>
-              </div>
-              {warning && <p className="modal-warning">{warning}</p>}
-            </div>
-          ) : (
-            <>
+          {activeTab === "details" ? (
+          <>
 
           <div className="field-grid">
             <label>Status<select value={draft.status} onChange={(event) => update("status", event.target.value)}>{config.statuses.map((status) => <option key={status.id} value={status.id}>{status.name}</option>)}</select></label>
@@ -1076,6 +1062,22 @@ function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning,
             <span>Ultima prelucrare: {lead.lastProcessedAt ? formatDateTime(lead.lastProcessedAt) : "-"}</span>
           </div>
 
+          <CommentsPanel lead={lead} draft={draft} currentManager={currentManager} lookups={lookups} onChange={update} />
+
+          <div className="field-grid">
+            <label>Email client<input value={draft.customerEmail} onChange={(event) => update("customerEmail", event.target.value)} placeholder="email oferit de client" /></label>
+            <label>Telefon / contact extra<input value={draft.phone} onChange={(event) => update("phone", event.target.value)} placeholder="+373..." /></label>
+          </div>
+          <label>Link Meta direct<input value={draft.metaUrl} onChange={(event) => update("metaUrl", event.target.value)} placeholder="https://business.facebook.com/latest/inbox/all?..." /></label>
+
+          <div className="modal-actions">
+            <button type="button" className="danger-btn" onClick={onArchive}>Arhiveaza</button>
+            <button type="submit" className="primary-btn">Salveaza</button>
+          </div>
+
+          <ClientHistory lead={lead} lookups={lookups} />
+          </>
+          ) : (
           <MessagesPanel
             lead={lead}
             draft={messageDraft}
@@ -1085,22 +1087,6 @@ function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning,
             onChange={setMessageDraft}
             onSubmit={submitMessage}
           />
-          <CommentsPanel lead={lead} draft={draft} currentManager={currentManager} lookups={lookups} onChange={update} />
-
-          <div className="field-grid">
-            <label>Email client<input value={draft.customerEmail} onChange={(event) => update("customerEmail", event.target.value)} placeholder="email oferit de client" /></label>
-            <label>Telefon / contact extra<input value={draft.phone} onChange={(event) => update("phone", event.target.value)} placeholder="+373..." /></label>
-          </div>
-          <label>Link Meta direct<input value={draft.metaUrl} onChange={(event) => update("metaUrl", event.target.value)} placeholder="https://business.facebook.com/latest/inbox/all?..." /></label>
-          {warning && <p className="modal-warning">{warning}</p>}
-
-          <div className="modal-actions">
-            <button type="button" className="danger-btn" onClick={onArchive}>Arhiveaza</button>
-            <button type="submit" className="primary-btn">Salveaza</button>
-          </div>
-
-          <ClientHistory lead={lead} lookups={lookups} />
-            </>
           )}
         </form>
       </section>
