@@ -57,6 +57,7 @@ export async function POST(request) {
     const manyChatResponse = await fetch(manyChatSendEndpoint, {
       method: "POST",
       headers: {
+        Accept: "application/json",
         Authorization: `Bearer ${manyChatApiKey}`,
         "Content-Type": "application/json"
       },
@@ -67,9 +68,9 @@ export async function POST(request) {
     const responsePayload = parseJson(responseText);
 
     if (!manyChatResponse.ok || responsePayload?.status === "error") {
-      const message = responsePayload?.message || responsePayload?.error || responseText || "ManyChat nu a acceptat mesajul.";
-      await insertOutgoingMessage(supabase, lead.id, manager.id, text, "failed", "", message);
-      return NextResponse.json({ error: message }, { status: 502 });
+      const message = manyChatErrorMessage(manyChatResponse.status, responsePayload, responseText);
+      await safeInsertOutgoingMessage(supabase, lead.id, manager.id, text, "failed", "", message);
+      return jsonError(message, 502);
     }
 
     const savedMessage = await insertOutgoingMessage(
@@ -99,7 +100,7 @@ export async function POST(request) {
     });
   } catch (error) {
     console.error("ManyChat send error:", error);
-    return NextResponse.json({ error: error.message || "Mesajul nu a putut fi trimis." }, { status: 500 });
+    return jsonError(error.message || "Mesajul nu a putut fi trimis.", 500);
   }
 }
 
@@ -159,6 +160,34 @@ async function insertOutgoingMessage(supabase, leadId, managerId, text, status, 
 
   if (error) throw error;
   return data;
+}
+
+async function safeInsertOutgoingMessage(supabase, leadId, managerId, text, status, externalId, errorMessage) {
+  try {
+    return await insertOutgoingMessage(supabase, leadId, managerId, text, status, externalId, errorMessage);
+  } catch (error) {
+    console.error("Failed to save outgoing message:", error);
+    return null;
+  }
+}
+
+function manyChatErrorMessage(status, payload, text) {
+  const jsonMessage = payload?.message || payload?.error || payload?.description;
+  if (jsonMessage) return `ManyChat a refuzat mesajul: ${jsonMessage}`;
+
+  const cleanText = String(text || "").replace(/\s+/g, " ").trim();
+  if (cleanText.startsWith("<!DOCTYPE") || cleanText.startsWith("<html")) {
+    return `ManyChat a raspuns cu pagina HTML in loc de JSON. Status ManyChat: ${status}. Verifica daca API-ul Public este activ pe planul ManyChat si daca endpointul de trimitere este permis.`;
+  }
+
+  return `ManyChat nu a acceptat mesajul. Status ManyChat: ${status}${cleanText ? `: ${cleanText.slice(0, 180)}` : ""}`;
+}
+
+function jsonError(message, status) {
+  return NextResponse.json({ error: message }, {
+    status,
+    headers: { "Content-Type": "application/json; charset=utf-8" }
+  });
 }
 
 function getBearerToken(request) {

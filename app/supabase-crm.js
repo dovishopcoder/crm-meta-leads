@@ -174,6 +174,7 @@ export async function createManager({ name, email, password, role, color }) {
   const response = await fetch("/api/admin/managers", {
     method: "POST",
     headers: {
+      Accept: "application/json",
       "Content-Type": "application/json",
       Authorization: `Bearer ${accessToken}`
     },
