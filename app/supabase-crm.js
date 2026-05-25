@@ -389,8 +389,10 @@ export async function sendManyChatMessage(leadId, text) {
     body: JSON.stringify({ leadId, text })
   });
 
-  const payload = await response.json();
+  const responseText = await response.text();
+  const payload = parseJson(responseText);
   if (!response.ok) throw new Error(payload.error || "Mesajul nu a putut fi trimis.");
+  if (!payload) throw new Error("Serverul a raspuns intr-un format invalid. Reincarca pagina si incearca din nou.");
   return payload.message;
 }
 
@@ -549,6 +551,14 @@ function isMissingLeadMessagesError(error) {
 
 function isMissingLeadColumnError(error, column) {
   return error?.code === "PGRST204" && new RegExp(column, "i").test(error?.message || "");
+}
+
+function parseJson(text) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
 }
 
 async function seedDemoLeads(refs) {

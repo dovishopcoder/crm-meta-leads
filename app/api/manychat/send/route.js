@@ -98,6 +98,7 @@ export async function POST(request) {
       }
     });
   } catch (error) {
+    console.error("ManyChat send error:", error);
     return NextResponse.json({ error: error.message || "Mesajul nu a putut fi trimis." }, { status: 500 });
   }
 }
