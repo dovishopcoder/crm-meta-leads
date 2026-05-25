@@ -70,7 +70,7 @@ export async function POST(request) {
     if (!manyChatResponse.ok || responsePayload?.status === "error") {
       const message = manyChatErrorMessage(manyChatResponse.status, responsePayload, responseText);
       await safeInsertOutgoingMessage(supabase, lead.id, manager.id, text, "failed", "", message);
-      return jsonError(message, 502);
+      return jsonError(message, 400);
     }
 
     const savedMessage = await insertOutgoingMessage(
