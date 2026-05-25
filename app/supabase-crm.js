@@ -341,7 +341,7 @@ export async function loadSupabaseLeads() {
   const refs = await ensureReferenceData();
   let { data, error } = await supabase
     .from("leads")
-    .select("*, lead_tags(tag), lead_products(status, proposed_at, product_id, products(code, name)), lead_stage_history(from_stage_id, to_stage_id, manager_id, changed_at), lead_interest_history(interest_code, changed_at, manager_id), lead_comments(comment, manager_id, created_at)")
+    .select("*, lead_tags(tag), lead_products(status, proposed_at, product_id, products(code, name)), lead_stage_history(from_stage_id, to_stage_id, manager_id, changed_at), lead_interest_history(interest_code, changed_at, manager_id), lead_comments(comment, manager_id, created_at), lead_messages(id, direction, body, manager_id, external_id, status, error, sent_at, created_at)")
     .order("created_at", { ascending: true });
 
   if (error && isMissingTableError(error)) {
@@ -363,6 +363,28 @@ export async function loadSupabaseLeads() {
   return data.map((lead) => fromSupabaseLead(lead, refs));
 }
 
+export async function sendManyChatMessage(leadId, text) {
+  if (!supabase) throw new Error("Supabase nu este configurat.");
+
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) throw sessionError;
+  const accessToken = sessionData.session?.access_token;
+  if (!accessToken) throw new Error("Sesiunea lipseste.");
+
+  const response = await fetch("/api/manychat/send", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`
+    },
+    body: JSON.stringify({ leadId, text })
+  });
+
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.error || "Mesajul nu a putut fi trimis.");
+  return payload.message;
+}
+
 export async function saveSupabaseLead(lead, options = {}) {
   if (!supabase) return lead;
 
@@ -370,6 +392,7 @@ export async function saveSupabaseLead(lead, options = {}) {
   const now = new Date().toISOString();
   const leadRow = {
     meta_contact_id: lead.metaContactId || lead.id,
+    manychat_id: lead.manyChatId || null,
     platform: lead.platform,
     name: lead.name,
     avatar_url: lead.avatar,
@@ -442,7 +465,7 @@ async function findExistingLeadByMetaUrl(metaUrl) {
 }
 
 async function saveLeadRowWithColumnFallback(action, leadRow) {
-  const optionalColumns = ["hook", "current_interest", "follow_up_time"];
+  const optionalColumns = ["hook", "current_interest", "follow_up_time", "manychat_id"];
   let result = await action();
   let changed = true;
   while (result.error && changed) {
@@ -525,6 +548,7 @@ function fromSupabaseLead(row, refs) {
   return {
     id: row.id,
     metaContactId: row.meta_contact_id,
+    manyChatId: row.manychat_id || "",
     name: row.name,
     platform: row.platform,
     avatar: row.avatar_url || "",
@@ -560,6 +584,17 @@ function fromSupabaseLead(row, refs) {
       managerId: refs.managerUuidToCode[comment.manager_id] || "unassigned",
       createdAt: comment.created_at
     })),
+    messages: (row.lead_messages || []).map((message) => ({
+      id: message.id,
+      direction: message.direction,
+      body: message.body,
+      managerId: refs.managerUuidToCode[message.manager_id] || "",
+      externalId: message.external_id || "",
+      status: message.status || "",
+      error: message.error || "",
+      sentAt: message.sent_at,
+      createdAt: message.created_at
+    })).sort((left, right) => new Date(left.sentAt || left.createdAt).getTime() - new Date(right.sentAt || right.createdAt).getTime()),
     products: (row.lead_products || []).map((item) => ({
       id: item.products?.code || refs.productUuidToCode[item.product_id],
       status: item.status,

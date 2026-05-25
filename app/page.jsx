@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppNav } from "./components";
-import { getCurrentSession, loadCrmConfig, loadCurrentManager, loadSupabaseLeads, saveSupabaseLead, signOut, supabase } from "./supabase-crm";
+import { getCurrentSession, loadCrmConfig, loadCurrentManager, loadSupabaseLeads, saveSupabaseLead, sendManyChatMessage, signOut, supabase } from "./supabase-crm";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const FALLBACK_MANAGER_ID = "diana";
@@ -292,6 +292,7 @@ export default function HomePage() {
     const channel = supabase
       .channel("crm-leads-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "leads" }, scheduleRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "lead_messages" }, scheduleRefresh)
       .subscribe();
 
     return () => {
@@ -471,6 +472,7 @@ export default function HomePage() {
       phone: manualLead.phone.trim(),
       notes: "",
       comments: initialComment ? [{ text: initialComment, managerId: currentManager?.code || manualLead.managerId || "unassigned", createdAt: now }] : [],
+      messages: [],
       followDate: "",
       followTime: ""
     };
@@ -612,6 +614,18 @@ export default function HomePage() {
       setSelectedId(null);
       setDraft(null);
     }
+  }
+
+  async function sendSelectedMessage(text) {
+    if (!selectedLead) return;
+    const savedMessage = await sendManyChatMessage(selectedLead.id, text);
+    setLeads((current) => current.map((lead) => {
+      if (lead.id !== selectedLead.id) return lead;
+      return {
+        ...lead,
+        messages: [...(lead.messages || []), savedMessage]
+      };
+    }));
   }
 
   function scheduleLead(id, dateKey) {
@@ -803,6 +817,7 @@ export default function HomePage() {
           onClose={closeModal}
           onArchive={archiveSelectedLead}
           onSave={saveSelectedLead}
+          onSendMessage={sendSelectedMessage}
         />
       )}
 
@@ -946,7 +961,11 @@ function ManualLeadModal({ draft, error, managers, hooks, onChange, onClose, onS
   );
 }
 
-function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning, config, isAdmin, lookups, currentManager, onChange, onClose, onArchive, onSave }) {
+function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning, config, isAdmin, lookups, currentManager, onChange, onClose, onArchive, onSave, onSendMessage }) {
+  const [messageDraft, setMessageDraft] = useState("");
+  const [messageState, setMessageState] = useState("idle");
+  const [messageError, setMessageError] = useState("");
+
   function update(field, value) {
     onChange({ ...draft, [field]: value });
   }
@@ -962,6 +981,24 @@ function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning,
   function saveMetaLinkOnly() {
     if (!draft.metaUrl.trim()) return;
     onSave({ metaLinkOnly: true, keepOpen: true });
+  }
+
+  async function submitMessage(event) {
+    event?.preventDefault();
+    const text = messageDraft.trim();
+    if (!text || messageState === "sending") return;
+
+    try {
+      setMessageState("sending");
+      setMessageError("");
+      await onSendMessage(text);
+      setMessageDraft("");
+      setMessageState("sent");
+      window.setTimeout(() => setMessageState("idle"), 1400);
+    } catch (error) {
+      setMessageError(error.message || "Mesajul nu a putut fi trimis.");
+      setMessageState("error");
+    }
   }
 
   return (
@@ -1039,6 +1076,15 @@ function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning,
             <span>Ultima prelucrare: {lead.lastProcessedAt ? formatDateTime(lead.lastProcessedAt) : "-"}</span>
           </div>
 
+          <MessagesPanel
+            lead={lead}
+            draft={messageDraft}
+            state={messageState}
+            error={messageError}
+            lookups={lookups}
+            onChange={setMessageDraft}
+            onSubmit={submitMessage}
+          />
           <CommentsPanel lead={lead} draft={draft} currentManager={currentManager} lookups={lookups} onChange={update} />
 
           <div className="field-grid">
@@ -1087,6 +1133,49 @@ function ClientHistory({ lead, lookups }) {
           {!items.length && <p className="empty-history">Nu exista istoric pentru acest client.</p>}
         </div>
       )}
+    </section>
+  );
+}
+
+function MessagesPanel({ lead, draft, state, error, lookups, onChange, onSubmit }) {
+  const messages = [...(lead.messages || [])].sort((left, right) => new Date(left.sentAt || left.createdAt).getTime() - new Date(right.sentAt || right.createdAt).getTime());
+  const canSend = Boolean(draft.trim()) && state !== "sending";
+
+  return (
+    <section className="modal-section messages-section">
+      <div className="comments-head">
+        <div>
+          <p className="eyebrow">Mesaje</p>
+          <h3>Conversatie ManyChat</h3>
+        </div>
+        <span className="comment-author">{messages.length} mesaje</span>
+      </div>
+
+      <div className="messages-list" aria-label="Conversatie client">
+        {messages.map((message) => {
+          const outgoing = message.direction === "outgoing";
+          return (
+            <article key={message.id || `${message.direction}-${message.sentAt}-${message.body}`} className={`message-bubble ${outgoing ? "outgoing" : "incoming"}`}>
+              <p>{message.body}</p>
+              <div className="message-meta">
+                <span>{outgoing ? lookups.managerForConfig(message.managerId || lead.managerId).name : lead.name}</span>
+                <span>{formatDateTime(message.sentAt || message.createdAt)}</span>
+              </div>
+              {message.status === "failed" && <span className="message-error">Netramis</span>}
+            </article>
+          );
+        })}
+        {!messages.length && <p className="empty-history">Inca nu exista mesaje salvate pentru acest client.</p>}
+      </div>
+
+      <div className="message-compose">
+        <textarea value={draft} onChange={(event) => onChange(event.target.value)} rows={3} placeholder="Scrie mesajul pentru client" />
+        <div className="message-compose-actions">
+          {error && <span className="message-error">{error}</span>}
+          {state === "sent" && <span className="message-ok">Trimis</span>}
+          <button type="button" className="primary-btn" onClick={onSubmit} disabled={!canSend}>{state === "sending" ? "Se trimite..." : "Trimite mesaj"}</button>
+        </div>
+      </div>
     </section>
   );
 }
@@ -1331,6 +1420,7 @@ function normalizeLead(lead) {
     tagHistory: Array.isArray(lead.tagHistory) ? lead.tagHistory : [],
     currentInterestHistory: Array.isArray(lead.currentInterestHistory) ? lead.currentInterestHistory : [],
     comments: Array.isArray(lead.comments) ? lead.comments : [],
+    messages: Array.isArray(lead.messages) ? lead.messages : [],
     products: Array.isArray(lead.products) ? lead.products.map((item) => (typeof item === "string" ? { id: item, status: "proposed", proposedAt: now, managerId: lead.managerId || "unassigned" } : item)) : [],
     activity: Array.isArray(lead.activity) ? lead.activity : [],
     followDate: followDateInputValue(lead.followDate),

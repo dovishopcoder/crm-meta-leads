@@ -31,6 +31,7 @@ create table products (
 create table leads (
   id uuid primary key default gen_random_uuid(),
   meta_contact_id text unique,
+  manychat_id text,
   platform text not null check (platform in ('facebook', 'instagram')),
   name text not null,
   avatar_url text,
@@ -94,6 +95,19 @@ create table lead_activity (
   created_at timestamptz not null default now()
 );
 
+create table lead_messages (
+  id uuid primary key default gen_random_uuid(),
+  lead_id uuid not null references leads(id) on delete cascade,
+  direction text not null check (direction in ('incoming', 'outgoing')),
+  body text not null,
+  manager_id uuid references managers(id) on delete set null,
+  external_id text,
+  status text not null default 'sent',
+  error text,
+  sent_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
 create table meta_webhook_events (
   id uuid primary key default gen_random_uuid(),
   meta_event_id text unique,
@@ -108,6 +122,8 @@ create index leads_follow_up_idx on leads (follow_up_at) where archived_at is nu
 create index leads_manager_idx on leads (manager_id);
 create index leads_stage_idx on leads (stage_id);
 create index lead_activity_lead_idx on lead_activity (lead_id, created_at desc);
+create index lead_messages_lead_idx on lead_messages (lead_id, sent_at desc);
+create unique index lead_messages_external_id_idx on lead_messages (external_id) where external_id is not null;
 
 insert into stages (code, name, position) values
   ('new', 'Nou', 1),

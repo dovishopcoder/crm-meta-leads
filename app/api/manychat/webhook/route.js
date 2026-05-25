@@ -44,6 +44,8 @@ function normalizeManyChatPayload(payload) {
     metaUrl: readFirst(payload.meta_url, payload.inbox_url, payload.live_chat_url, payload.profile_url, contact.meta_url, contact.inbox_url, contact.live_chat_url),
     email: readFirst(payload.email, contact.email),
     phone: readFirst(payload.phone, payload.phone_number, contact.phone, contact.phone_number),
+    text: readFirst(payload.last_input_text, payload.message_text, payload.message, payload.text, payload.input, payload.body, payload.message?.text, contact.last_input_text),
+    externalMessageId: readFirst(payload.message_id, payload.mid, payload.external_id, payload.message?.id),
     messageAt: normalizeDate(readFirst(payload.message_at, payload.created_at, payload.last_interaction, contact.last_interaction)),
     raw: payload
   };
@@ -59,27 +61,30 @@ async function upsertManyChatLead(supabase, message) {
       ? await supabase.from("stages").select("id").eq("code", "reactivated").maybeSingle()
       : { data: null };
 
-    const { data, error } = await supabase
+    const updatePayload = removeUndefined({
+      meta_contact_id: message.metaContactId || undefined,
+      manychat_id: message.manyChatId || undefined,
+      name: chooseName(existing.name, message.name),
+      avatar_url: chooseAvatarUrl(existing.avatar_url, message.avatarUrl),
+      meta_url: existing.meta_url || undefined,
+      customer_email: message.email || undefined,
+      phone: message.phone || undefined,
+      status: wasArchived ? "reactivated" : undefined,
+      unread: true,
+      archived_at: wasArchived ? null : undefined,
+      stage_id: wasArchived && reactivatedStage?.id ? reactivatedStage.id : undefined,
+      last_message_at: message.messageAt || now,
+      updated_at: now
+    });
+    const { data, error } = await saveLeadMutationWithFallback(() => supabase
       .from("leads")
-      .update(removeUndefined({
-        meta_contact_id: message.metaContactId || undefined,
-        name: chooseName(existing.name, message.name),
-        avatar_url: chooseAvatarUrl(existing.avatar_url, message.avatarUrl),
-        meta_url: existing.meta_url || undefined,
-        customer_email: message.email || undefined,
-        phone: message.phone || undefined,
-        status: wasArchived ? "reactivated" : undefined,
-        unread: true,
-        archived_at: wasArchived ? null : undefined,
-        stage_id: wasArchived && reactivatedStage?.id ? reactivatedStage.id : undefined,
-        last_message_at: message.messageAt || now,
-        updated_at: now
-      }))
+      .update(updatePayload)
       .eq("id", existing.id)
       .select("id, name, platform")
-      .single();
+      .single(), updatePayload);
 
     if (error) throw error;
+    await insertIncomingMessage(supabase, existing.id, message);
     await insertActivity(supabase, existing.id, wasArchived ? "reactivated_by_message" : "incoming_message", {
       source: "manychat",
       manyChatId: message.manyChatId || null
@@ -88,10 +93,9 @@ async function upsertManyChatLead(supabase, message) {
   }
 
   const { data: stage } = await supabase.from("stages").select("id").eq("code", "new").maybeSingle();
-  const { data, error } = await supabase
-    .from("leads")
-    .insert({
+  const insertPayload = {
       meta_contact_id: message.metaContactId,
+      manychat_id: message.manyChatId || null,
       platform: message.platform,
       name: message.name,
       avatar_url: message.avatarUrl || "",
@@ -106,11 +110,15 @@ async function upsertManyChatLead(supabase, message) {
       first_message_at: message.messageAt || now,
       last_message_at: message.messageAt || now,
       processed_count: 0
-    })
+    };
+  const { data, error } = await saveLeadMutationWithFallback(() => supabase
+    .from("leads")
+    .insert(insertPayload)
     .select("id, name, platform")
-    .single();
+    .single(), insertPayload);
 
   if (error) throw error;
+  await insertIncomingMessage(supabase, data.id, message);
   await insertActivity(supabase, data.id, "incoming_message", {
     source: "manychat",
     created: true,
@@ -226,10 +234,76 @@ function removeUndefined(object) {
   return Object.fromEntries(Object.entries(object).filter(([, value]) => value !== undefined));
 }
 
+async function saveLeadMutationWithFallback(action, payload) {
+  let result = await action();
+  if (result.error && isMissingManyChatColumnError(result.error) && "manychat_id" in payload) {
+    delete payload.manychat_id;
+    result = await action();
+  }
+  return result;
+}
+
+function isMissingManyChatColumnError(error) {
+  return error?.code === "PGRST204" && /manychat_id/i.test(error?.message || "");
+}
+
 async function insertActivity(supabase, leadId, type, payload) {
   await supabase.from("lead_activity").insert({
     lead_id: leadId,
     type,
     payload
   });
+}
+
+async function insertIncomingMessage(supabase, leadId, message) {
+  if (!message.text) return;
+
+  const externalId = message.externalMessageId || buildMessageExternalId(message);
+  if (externalId) {
+    const { data: existing, error: lookupError } = await supabase
+      .from("lead_messages")
+      .select("id")
+      .eq("external_id", externalId)
+      .limit(1);
+
+    if (lookupError) {
+      if (isMissingMessageTableError(lookupError)) return;
+      throw lookupError;
+    }
+    if (existing?.length) return;
+  }
+
+  const { error } = await supabase.from("lead_messages").insert({
+    lead_id: leadId,
+    direction: "incoming",
+    body: message.text,
+    external_id: externalId || null,
+    status: "received",
+    sent_at: message.messageAt || new Date().toISOString()
+  });
+
+  if (error) {
+    if (isMissingMessageTableError(error)) return;
+    if (error.code === "23505") return;
+    throw error;
+  }
+}
+
+function buildMessageExternalId(message) {
+  if (!message.manyChatId || !message.text) return "";
+  const stamp = message.messageAt || "";
+  return `manychat:${message.manyChatId}:${stamp}:${hashText(message.text)}`;
+}
+
+function hashText(value) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash << 5) - hash + value.charCodeAt(index);
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(36);
+}
+
+function isMissingMessageTableError(error) {
+  return error?.code === "42P01" || /lead_messages|schema cache|does not exist/i.test(error?.message || "");
 }
