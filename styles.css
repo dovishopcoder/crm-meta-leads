@@ -1337,6 +1337,64 @@ label textarea {
     overflow-x: hidden;
   }
 
+  h1 {
+    font-size: 22px;
+    line-height: 1.12;
+  }
+
+  .crm-top-menu {
+    padding: 10px 14px 8px;
+  }
+
+  .crm-top-menu .app-nav {
+    margin-bottom: 0;
+  }
+
+  .app-nav {
+    gap: 8px;
+  }
+
+  .nav-brand {
+    order: -1;
+    grid-column: 1 / -1;
+    justify-self: center;
+  }
+
+  .nav-brand img {
+    max-width: 170px;
+  }
+
+  .nav-right {
+    display: contents;
+  }
+
+  .nav-menu-toggle {
+    width: 42px;
+    height: 40px;
+    min-height: 40px;
+  }
+
+  .nav-user {
+    min-height: 40px;
+    padding: 0 10px;
+    justify-content: center;
+    font-size: 13px;
+  }
+
+  .nav-user-status .nav-health-text {
+    padding-left: 8px;
+    margin-left: 4px;
+  }
+
+  .mobile-crm-tabs {
+    gap: 8px;
+    padding: 8px 14px 7px;
+  }
+
+  .mobile-crm-tabs button {
+    min-height: 36px;
+  }
+
   .inbox-panel,
   .calendar-panel,
   .client-modal {
@@ -1344,28 +1402,62 @@ label textarea {
   }
 
   .inbox-panel {
-    gap: 12px;
+    gap: 10px;
   }
 
   .panel-head,
   .archive-head {
-    align-items: flex-start;
-    gap: 10px;
+    align-items: center;
+    gap: 12px;
   }
 
   .panel-head-actions {
-    align-items: stretch;
-    flex-direction: column-reverse;
+    display: grid;
+    grid-template-columns: 74px;
+    gap: 6px;
   }
 
   .count-badge {
-    min-width: 34px;
-    height: 34px;
+    min-width: 0;
+    width: 100%;
+    height: 36px;
+    font-size: 19px;
+  }
+
+  .panel-head-actions .mini-btn {
+    min-height: 34px;
+    padding: 0 8px;
+    font-size: 12px;
   }
 
   .quick-filters {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .chip {
+    min-height: 36px;
+    padding: 0 8px;
+    font-size: 13px;
+  }
+
+  .search-wrap input {
+    height: 40px;
+    font-size: 15px;
+  }
+
+  .compact-label {
+    font-size: 12px;
+  }
+
+  .compact-label select {
+    min-height: 40px;
+  }
+
+  .toggle-row {
+    min-height: 42px;
+    padding: 7px 10px;
   }
 
   .chip,

@@ -688,8 +688,8 @@ export default function HomePage() {
             <h1>Lead-uri noi</h1>
           </div>
           <div className="panel-head-actions">
-            <button type="button" className="mini-btn primary" onClick={() => setManualLeadOpen(true)}>Lead manual</button>
             <span className="count-badge">{filteredLeads.length}</span>
+            <button type="button" className="mini-btn primary" onClick={() => setManualLeadOpen(true)}>Lead manual</button>
           </div>
         </div>
 
