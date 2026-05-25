@@ -391,8 +391,10 @@ export async function sendManyChatMessage(leadId, text) {
 
   const responseText = await response.text();
   const payload = parseJson(responseText);
+  if (!payload) {
+    throw new Error(response.ok ? "Serverul a raspuns intr-un format invalid. Reincarca pagina si incearca din nou." : "Serverul nu a putut procesa trimiterea mesajului.");
+  }
   if (!response.ok) throw new Error(payload.error || "Mesajul nu a putut fi trimis.");
-  if (!payload) throw new Error("Serverul a raspuns intr-un format invalid. Reincarca pagina si incearca din nou.");
   return payload.message;
 }
 
