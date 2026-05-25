@@ -471,7 +471,8 @@ export default function HomePage() {
       phone: manualLead.phone.trim(),
       notes: "",
       comments: initialComment ? [{ text: initialComment, managerId: currentManager?.code || manualLead.managerId || "unassigned", createdAt: now }] : [],
-      followDate: ""
+      followDate: "",
+      followTime: ""
     };
 
     setSaveState("saving");
@@ -552,12 +553,14 @@ export default function HomePage() {
         return lead;
       }
 
-      const nextFollowDate = normalizeFollowInput(draft.followDate, draft.followHour, draft.followMinute);
+      const nextFollowDate = normalizeFollowInput(draft.followDate);
+      const nextFollowTime = normalizeFollowTime(draft.followHour, draft.followMinute);
       lead.status = nextFollowDate ? "scheduled" : draft.status;
-      lead.unread = false;
+      lead.unread = modalSource === "inbox" ? false : lead.unread;
       lead.managerId = draft.managerId;
       lead.priority = draft.priority;
       lead.followDate = nextFollowDate;
+      lead.followTime = nextFollowTime;
       lead.stage = draft.stage;
       lead.tags = draft.tags.split(",").map((tag) => tag.trim()).filter(Boolean);
       if (!lead.hook || currentManager?.role === "admin") {
@@ -595,6 +598,7 @@ export default function HomePage() {
           managerId: draft.managerId,
           stage: lead.stage,
           followDate: lead.followDate,
+          followTime: lead.followTime,
           products: selectedProducts.filter((item) => !previousProducts.has(item.id)).map((item) => item.id),
           currentInterest: previousInterest !== lead.currentInterest ? lead.currentInterest : "",
           commentAdded: Boolean(newComment)
@@ -613,7 +617,7 @@ export default function HomePage() {
   function scheduleLead(id, dateKey) {
     if (!isTodayOrFutureDateKey(dateKey)) return;
     updateLead(id, (lead) => {
-      const followDate = moveFollowDateToDay(lead.followDate, dateKey);
+      const followDate = moveFollowDateToDay(dateKey);
       return {
         ...lead,
         followDate,
@@ -757,7 +761,7 @@ export default function HomePage() {
               if (lead.archived || followDateKey(lead.followDate) !== key) return false;
               if (onlyMyLeads && lead.managerId !== (currentManager?.code || FALLBACK_MANAGER_ID)) return false;
               return managerFilter === "all" || lead.managerId === managerFilter;
-            }).sort((left, right) => followDateSortValue(left.followDate) - followDateSortValue(right.followDate));
+            }).sort((left, right) => followDateSortValue(left.followDate, left.followTime) - followDateSortValue(right.followDate, right.followTime));
             return (
               <section
                 key={key}
@@ -827,7 +831,7 @@ function LeadCard({ lead, lookups, onOpen, onDragStart }) {
           <span className="lead-name">{lead.name}</span>
           <span className={`platform-pill platform-${lead.platform}`}>{platformLabel(lead.platform)}</span>
         </div>
-        <p className="lead-details">{lead.followDate ? `Urmatorul mesaj: ${formatFollowDateTime(lead.followDate)}` : "Neprogramat"}</p>
+        <p className="lead-details">{lead.followDate ? `Urmatorul mesaj: ${formatFollowDateTime(lead.followDate, lead.followTime)}` : "Neprogramat"}</p>
         <div className="manager-line">
           <span className="manager-dot" style={{ "--manager-color": managerForConfig(lead.managerId).color }} />
           <span>{managerForConfig(lead.managerId).name}</span>
@@ -852,7 +856,7 @@ function EventCard({ lead, lookups, onOpen, onDragStart }) {
   const manager = managerForConfig(lead.managerId);
   const isAssigned = lead.managerId && lead.managerId !== "unassigned";
   const currentInterest = lead.currentInterest ? currentInterestForConfig(lead.currentInterest).name : "Interes neindicat";
-  const followTime = formatFollowTime(lead.followDate);
+  const followTime = formatFollowTime(lead.followTime);
   return (
     <article className={`event-card ${lead.platform} ${lead.priority === "high" ? "priority-high" : ""}`} draggable onDragStart={onDragStart}>
       <div className="event-card-head">
@@ -862,8 +866,12 @@ function EventCard({ lead, lookups, onOpen, onDragStart }) {
           <span>{currentInterest}</span>
         </div>
       </div>
-      {followTime && <div className="event-time">Ora {followTime}</div>}
-      {lead.unread && <div className="event-badges"><span className="status-pill unread-pill">Mesaj nou</span></div>}
+      {(followTime || lead.unread) && (
+        <div className="event-badges">
+          {followTime && <span className="event-time">Ora {followTime}</span>}
+          {lead.unread && <span className="status-pill unread-pill">Mesaj nou</span>}
+        </div>
+      )}
       {isAssigned && (
         <div className="manager-line">
           <span className="manager-dot" style={{ "--manager-color": manager.color }} />
@@ -1198,7 +1206,7 @@ function activityDetail(activity, lookups) {
     const details = [];
     if (activity.stage) details.push(`Etapa: ${lookups.stageForConfig(activity.stage).name}`);
     if (activity.currentInterest) details.push(`Interes: ${lookups.currentInterestForConfig(activity.currentInterest).name}`);
-    if (activity.followDate) details.push(`Follow-up: ${formatFollowDateTime(activity.followDate)}`);
+    if (activity.followDate) details.push(`Follow-up: ${formatFollowDateTime(activity.followDate, activity.followTime)}`);
     if (activity.products?.length) details.push(`Produse noi: ${activity.products.map((id) => lookups.productForConfig(id).name).join(", ")}`);
     return details.join(" · ");
   }
@@ -1324,7 +1332,9 @@ function normalizeLead(lead) {
     currentInterestHistory: Array.isArray(lead.currentInterestHistory) ? lead.currentInterestHistory : [],
     comments: Array.isArray(lead.comments) ? lead.comments : [],
     products: Array.isArray(lead.products) ? lead.products.map((item) => (typeof item === "string" ? { id: item, status: "proposed", proposedAt: now, managerId: lead.managerId || "unassigned" } : item)) : [],
-    activity: Array.isArray(lead.activity) ? lead.activity : []
+    activity: Array.isArray(lead.activity) ? lead.activity : [],
+    followDate: followDateInputValue(lead.followDate),
+    followTime: lead.followTime || extractFollowTime(lead.followDate)
   };
 }
 
@@ -1349,7 +1359,7 @@ function makeLeadDraft(lead) {
     managerId: lead.managerId || "unassigned",
     priority: lead.priority || "normal",
     followDate: followDateInputValue(lead.followDate),
-    ...followTimeInputValue(lead.followDate),
+    ...followTimeInputValue(lead.followTime || extractFollowTime(lead.followDate)),
     stage: lead.stage || "new",
     tags: (lead.tags || []).join(", "),
     hook: lead.hook || "",
@@ -1475,8 +1485,14 @@ function followDateKey(value) {
   return date ? toDateKey(date) : "";
 }
 
-function followDateSortValue(value) {
-  return parseFollowDate(value)?.getTime() || 0;
+function followDateSortValue(value, timeValue = "") {
+  const date = parseFollowDate(value);
+  if (!date) return 0;
+  if (timeValue) {
+    const [hours, minutes] = timeValue.split(":").map(Number);
+    date.setHours(hours || 0, minutes || 0, 0, 0);
+  }
+  return date.getTime();
 }
 
 function followDateInputValue(value) {
@@ -1488,30 +1504,26 @@ function followDateInputValue(value) {
 }
 
 function followTimeInputValue(value) {
-  if (!hasExplicitFollowTime(value)) return { followHour: "", followMinute: "" };
-  const date = parseFollowDate(value);
-  if (!date) return { followHour: "", followMinute: "" };
+  if (!value) return { followHour: "", followMinute: "" };
+  const [hour = "", minute = "00"] = String(value).split(":");
   return {
-    followHour: String(date.getHours()).padStart(2, "0"),
-    followMinute: String(date.getMinutes()).padStart(2, "0")
+    followHour: hour.padStart(2, "0"),
+    followMinute: minute.padStart(2, "0")
   };
 }
 
-function normalizeFollowInput(dateValue, hourValue = "", minuteValue = "00") {
+function normalizeFollowInput(dateValue) {
   if (!dateValue) return "";
-  if (!hourValue) return dateValue;
-  const date = new Date(`${dateValue}T${hourValue}:${minuteValue || "00"}`);
-  return Number.isNaN(date.getTime()) ? "" : date.toISOString();
+  return followDateInputValue(dateValue);
 }
 
-function moveFollowDateToDay(value, dateKey) {
-  if (!hasExplicitFollowTime(value)) return dateKey;
-  const existing = parseFollowDate(value);
-  const hours = existing ? existing.getHours() : 9;
-  const minutes = existing ? existing.getMinutes() : 0;
-  const next = parseKey(dateKey);
-  next.setHours(hours, minutes, 0, 0);
-  return next.toISOString();
+function normalizeFollowTime(hourValue = "", minuteValue = "00") {
+  if (!hourValue) return "";
+  return `${hourValue}:${minuteValue || "00"}`;
+}
+
+function moveFollowDateToDay(dateKey) {
+  return dateKey;
 }
 
 function startOfDay(date) {
@@ -1549,24 +1561,32 @@ function formatShortDate(date) {
   return new Intl.DateTimeFormat("ro-RO", { day: "numeric", month: "short" }).format(date);
 }
 
-function formatFollowDateTime(value) {
+function formatFollowDateTime(value, timeValue = "") {
   const date = parseFollowDate(value);
   if (!date) return "-";
-  const options = hasExplicitFollowTime(value)
+  const options = timeValue
     ? { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }
     : { day: "numeric", month: "short" };
+  if (timeValue) {
+    const [hours, minutes] = timeValue.split(":").map(Number);
+    date.setHours(hours || 0, minutes || 0, 0, 0);
+  }
   return new Intl.DateTimeFormat("ro-RO", options).format(date);
 }
 
 function formatFollowTime(value) {
-  if (!hasExplicitFollowTime(value)) return "";
-  const date = parseFollowDate(value);
-  if (!date) return "";
-  return new Intl.DateTimeFormat("ro-RO", { hour: "2-digit", minute: "2-digit" }).format(date);
+  return value || "";
 }
 
 function hasExplicitFollowTime(value) {
   return Boolean(value && !/^\d{4}-\d{2}-\d{2}$/.test(value));
+}
+
+function extractFollowTime(value) {
+  if (!hasExplicitFollowTime(value)) return "";
+  const date = parseFollowDate(value);
+  if (!date) return "";
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
 function formatLongDate(date) {

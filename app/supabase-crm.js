@@ -387,6 +387,7 @@ export async function saveSupabaseLead(lead, options = {}) {
     manager_id: refs.managerCodeToUuid[lead.managerId] || null,
     stage_id: refs.stageCodeToUuid[lead.stage] || null,
     follow_up_at: lead.followDate || null,
+    follow_up_time: lead.followTime || null,
     first_message_at: lead.firstMessageAt || now,
     last_message_at: lead.lastMessageAt || lead.firstMessageAt || now,
     last_processed_at: lead.lastProcessedAt || null,
@@ -441,7 +442,7 @@ async function findExistingLeadByMetaUrl(metaUrl) {
 }
 
 async function saveLeadRowWithColumnFallback(action, leadRow) {
-  const optionalColumns = ["hook", "current_interest"];
+  const optionalColumns = ["hook", "current_interest", "follow_up_time"];
   let result = await action();
   let changed = true;
   while (result.error && changed) {
@@ -571,7 +572,8 @@ function fromSupabaseLead(row, refs) {
     tags: (row.lead_tags || []).map((tag) => tag.tag),
     phone: row.phone || "",
     notes: row.notes || "",
-    followDate: row.follow_up_at || ""
+    followDate: row.follow_up_at || "",
+    followTime: row.follow_up_time || ""
   };
 }
 

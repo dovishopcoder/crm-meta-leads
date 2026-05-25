@@ -47,6 +47,7 @@ create table leads (
   manager_id uuid references managers(id) on delete set null,
   stage_id uuid references stages(id) on delete set null,
   follow_up_at date,
+  follow_up_time text check (follow_up_time is null or follow_up_time ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'),
   first_message_at timestamptz not null default now(),
   last_message_at timestamptz not null default now(),
   last_processed_at timestamptz,

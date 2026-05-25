@@ -564,11 +564,11 @@ label textarea {
   margin-top: 2px;
 }
 
-.event-time {
+.event-card .event-time {
   display: inline-flex;
   align-items: center;
   width: fit-content;
-  margin-top: 8px;
+  margin-top: 0;
   padding: 4px 8px;
   border: 1px solid #cfe4dd;
   border-radius: 999px;
@@ -604,9 +604,15 @@ label textarea {
 
 .event-badges {
   display: flex;
+  align-items: center;
   gap: 6px;
   flex-wrap: wrap;
   margin-top: 8px;
+}
+
+.event-card .event-badges .status-pill {
+  display: inline-flex;
+  margin-top: 0;
 }
 
 .unread-pill {
