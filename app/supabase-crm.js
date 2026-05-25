@@ -344,6 +344,15 @@ export async function loadSupabaseLeads() {
     .select("*, lead_tags(tag), lead_products(status, proposed_at, product_id, products(code, name)), lead_stage_history(from_stage_id, to_stage_id, manager_id, changed_at), lead_interest_history(interest_code, changed_at, manager_id), lead_comments(comment, manager_id, created_at), lead_messages(id, direction, body, manager_id, external_id, status, error, sent_at, created_at)")
     .order("created_at", { ascending: true });
 
+  if (error && isMissingLeadMessagesError(error)) {
+    const fallback = await supabase
+      .from("leads")
+      .select("*, lead_tags(tag), lead_products(status, proposed_at, product_id, products(code, name)), lead_stage_history(from_stage_id, to_stage_id, manager_id, changed_at), lead_interest_history(interest_code, changed_at, manager_id), lead_comments(comment, manager_id, created_at)")
+      .order("created_at", { ascending: true });
+    data = fallback.data;
+    error = fallback.error;
+  }
+
   if (error && isMissingTableError(error)) {
     const fallback = await supabase
       .from("leads")
@@ -532,6 +541,10 @@ async function loadOptionalOptionRows(table, fallbackRows) {
 
 function isMissingTableError(error) {
   return error?.code === "42P01" || /schema cache|does not exist|Could not find the table/i.test(error?.message || "");
+}
+
+function isMissingLeadMessagesError(error) {
+  return /lead_messages/i.test(error?.message || "");
 }
 
 function isMissingLeadColumnError(error, column) {
