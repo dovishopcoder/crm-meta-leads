@@ -727,11 +727,13 @@ label textarea {
 }
 
 .modal-tabs button {
-  min-height: 40px;
+  min-height: 36px;
+  padding: 7px 10px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 7px;
   background: #fff;
   color: var(--text);
+  font-size: 14px;
   font-weight: 850;
 }
 
@@ -1494,6 +1496,16 @@ label textarea {
   .modal-top h3 {
     font-size: 20px;
     line-height: 1.2;
+  }
+
+  .modal-tabs {
+    gap: 6px;
+  }
+
+  .modal-tabs button {
+    min-height: 34px;
+    padding: 6px 8px;
+    font-size: 13px;
   }
 
   .modal-actions {
