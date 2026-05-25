@@ -662,6 +662,19 @@ label textarea {
   box-shadow: var(--shadow);
 }
 
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: rgba(15, 23, 42, 0.42);
+}
+
 .manual-lead-dialog {
   width: min(560px, calc(100vw - 28px));
 }
@@ -673,6 +686,7 @@ label textarea {
 .client-modal {
   position: relative;
   display: grid;
+  align-content: start;
   gap: 16px;
   padding: 24px;
 }
@@ -1466,13 +1480,23 @@ label textarea {
 
   .client-dialog {
     width: 100%;
+    max-height: none;
     border-radius: 0;
+  }
+
+  .dialog-backdrop {
+    align-items: stretch;
+    justify-content: stretch;
+    padding: 0;
+    overflow: hidden;
   }
 
   .client-modal {
     gap: 12px;
-    min-height: 100vh;
-    padding-bottom: 20px;
+    height: 100dvh;
+    min-height: 0;
+    overflow: auto;
+    padding-bottom: 16px;
   }
 
   .close-btn {
@@ -1503,9 +1527,40 @@ label textarea {
   }
 
   .modal-tabs button {
-    min-height: 34px;
-    padding: 6px 8px;
-    font-size: 13px;
+    min-height: 30px;
+    padding: 4px 8px;
+    border-radius: 7px;
+    font-size: 12px;
+  }
+
+  .messages-section {
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100dvh - 250px);
+  }
+
+  .messages-list {
+    flex: 1;
+    max-height: none;
+    min-height: 150px;
+  }
+
+  .message-compose {
+    position: sticky;
+    bottom: -1px;
+    margin: 0 -12px -12px;
+    padding: 10px 12px 12px;
+    border-top: 1px solid var(--line);
+    background: #f9fbfd;
+  }
+
+  .message-compose textarea {
+    min-height: 72px;
+  }
+
+  .message-compose-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .modal-actions {
