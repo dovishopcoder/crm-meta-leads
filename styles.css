@@ -578,6 +578,12 @@ label textarea {
   font-weight: 850;
 }
 
+.time-select-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
 .event-actions {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
