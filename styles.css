@@ -564,6 +564,20 @@ label textarea {
   margin-top: 2px;
 }
 
+.event-time {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin-top: 8px;
+  padding: 4px 8px;
+  border: 1px solid #cfe4dd;
+  border-radius: 999px;
+  background: #eefaf6;
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 850;
+}
+
 .event-actions {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

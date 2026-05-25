@@ -523,8 +523,8 @@ export default function HomePage() {
     if (!selectedLead || !draft) return true;
     if (modalSource !== "inbox" || !selectedLead.unread) return true;
     if (!selectedLead.metaUrlVerified && !draft.metaUrlVerified) return true;
-    if (isTodayOrFutureDateKey(draft.followDate)) return true;
-    setWarning("Alege o data de follow-up pentru azi sau viitor, apoi apasa Salveaza. Un mesaj deschis din necitite nu poate fi inchis fara urmatorul pas.");
+    if (isTodayOrFutureFollowDate(draft.followDate)) return true;
+    setWarning("Alege data si ora de follow-up pentru azi sau viitor, apoi apasa Salveaza. Un mesaj deschis din necitite nu poate fi inchis fara urmatorul pas.");
     return false;
   }
 
@@ -550,11 +550,12 @@ export default function HomePage() {
         return lead;
       }
 
-      lead.status = draft.followDate ? "scheduled" : draft.status;
+      const nextFollowDate = normalizeFollowInput(draft.followDate);
+      lead.status = nextFollowDate ? "scheduled" : draft.status;
       lead.unread = false;
       lead.managerId = draft.managerId;
       lead.priority = draft.priority;
-      lead.followDate = draft.followDate;
+      lead.followDate = nextFollowDate;
       lead.stage = draft.stage;
       lead.tags = draft.tags.split(",").map((tag) => tag.trim()).filter(Boolean);
       if (!lead.hook || currentManager?.role === "admin") {
@@ -609,13 +610,16 @@ export default function HomePage() {
 
   function scheduleLead(id, dateKey) {
     if (!isTodayOrFutureDateKey(dateKey)) return;
-    updateLead(id, (lead) => ({
-      ...lead,
-      followDate: dateKey,
-      status: "scheduled",
-      unread: false,
-      managerId: lead.managerId || "unassigned"
-    }));
+    updateLead(id, (lead) => {
+      const followDate = moveFollowDateToDay(lead.followDate, dateKey);
+      return {
+        ...lead,
+        followDate,
+        status: "scheduled",
+        unread: false,
+        managerId: lead.managerId || "unassigned"
+      };
+    });
   }
 
   function archiveSelectedLead() {
@@ -748,10 +752,10 @@ export default function HomePage() {
           {visibleDates.map((date) => {
             const key = toDateKey(date);
             const events = leads.filter((lead) => {
-              if (lead.archived || lead.followDate !== key) return false;
+              if (lead.archived || followDateKey(lead.followDate) !== key) return false;
               if (onlyMyLeads && lead.managerId !== (currentManager?.code || FALLBACK_MANAGER_ID)) return false;
               return managerFilter === "all" || lead.managerId === managerFilter;
-            });
+            }).sort((left, right) => followDateSortValue(left.followDate) - followDateSortValue(right.followDate));
             return (
               <section
                 key={key}
@@ -821,7 +825,7 @@ function LeadCard({ lead, lookups, onOpen, onDragStart }) {
           <span className="lead-name">{lead.name}</span>
           <span className={`platform-pill platform-${lead.platform}`}>{platformLabel(lead.platform)}</span>
         </div>
-        <p className="lead-details">{lead.followDate ? `Urmatorul mesaj: ${formatShortDate(parseKey(lead.followDate))}` : "Neprogramat"}</p>
+        <p className="lead-details">{lead.followDate ? `Urmatorul mesaj: ${formatFollowDateTime(lead.followDate)}` : "Neprogramat"}</p>
         <div className="manager-line">
           <span className="manager-dot" style={{ "--manager-color": managerForConfig(lead.managerId).color }} />
           <span>{managerForConfig(lead.managerId).name}</span>
@@ -846,6 +850,7 @@ function EventCard({ lead, lookups, onOpen, onDragStart }) {
   const manager = managerForConfig(lead.managerId);
   const isAssigned = lead.managerId && lead.managerId !== "unassigned";
   const currentInterest = lead.currentInterest ? currentInterestForConfig(lead.currentInterest).name : "Interes neindicat";
+  const followTime = formatFollowTime(lead.followDate);
   return (
     <article className={`event-card ${lead.platform} ${lead.priority === "high" ? "priority-high" : ""}`} draggable onDragStart={onDragStart}>
       <div className="event-card-head">
@@ -855,6 +860,7 @@ function EventCard({ lead, lookups, onOpen, onDragStart }) {
           <span>{currentInterest}</span>
         </div>
       </div>
+      {followTime && <div className="event-time">Ora {followTime}</div>}
       {lead.unread && <div className="event-badges"><span className="status-pill unread-pill">Mesaj nou</span></div>}
       {isAssigned && (
         <div className="manager-line">
@@ -956,7 +962,7 @@ function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning,
 
           {requiresFollowUp && (
             <div className="modal-info">
-              Mesaj deschis din necitite. Alege follow-up pentru azi sau viitor inainte de inchidere.
+              Mesaj deschis din necitite. Alege data si ora de follow-up pentru azi sau viitor inainte de inchidere.
             </div>
           )}
 
@@ -980,7 +986,7 @@ function ClientModal({ lead, draft, requiresFollowUp, requiresMetaLink, warning,
           </div>
 
           <div className="field-grid">
-            <label>Urmatorul mesaj<input value={draft.followDate} onChange={(event) => update("followDate", event.target.value)} type="date" /></label>
+            <label>Urmatorul mesaj<input value={draft.followDate} onChange={(event) => update("followDate", event.target.value)} type="datetime-local" /></label>
             <label>Prioritate<select value={draft.priority} onChange={(event) => update("priority", event.target.value)}><option value="normal">Normala</option><option value="high">Inalta</option><option value="low">Joasa</option></select></label>
           </div>
 
@@ -1175,7 +1181,7 @@ function activityDetail(activity, lookups) {
     const details = [];
     if (activity.stage) details.push(`Etapa: ${lookups.stageForConfig(activity.stage).name}`);
     if (activity.currentInterest) details.push(`Interes: ${lookups.currentInterestForConfig(activity.currentInterest).name}`);
-    if (activity.followDate) details.push(`Follow-up: ${formatShortDate(parseKey(activity.followDate))}`);
+    if (activity.followDate) details.push(`Follow-up: ${formatFollowDateTime(activity.followDate)}`);
     if (activity.products?.length) details.push(`Produse noi: ${activity.products.map((id) => lookups.productForConfig(id).name).join(", ")}`);
     return details.join(" · ");
   }
@@ -1325,7 +1331,7 @@ function makeLeadDraft(lead) {
     status: lead.status,
     managerId: lead.managerId || "unassigned",
     priority: lead.priority || "normal",
-    followDate: lead.followDate || "",
+    followDate: followInputValue(lead.followDate),
     stage: lead.stage || "new",
     tags: (lead.tags || []).join(", "),
     hook: lead.hook || "",
@@ -1439,6 +1445,48 @@ function parseKey(key) {
   return new Date(year, month - 1, day);
 }
 
+function parseFollowDate(value) {
+  if (!value) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return parseKey(value);
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function followDateKey(value) {
+  const date = parseFollowDate(value);
+  return date ? toDateKey(date) : "";
+}
+
+function followDateSortValue(value) {
+  return parseFollowDate(value)?.getTime() || 0;
+}
+
+function followInputValue(value) {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return `${value}T09:00`;
+  const date = parseFollowDate(value);
+  if (!date) return "";
+  return `${toDateKey(date)}T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function normalizeFollowInput(value) {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return new Date(`${value}T09:00`).toISOString();
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString();
+}
+
+function moveFollowDateToDay(value, dateKey) {
+  const existing = parseFollowDate(value);
+  const hours = existing ? existing.getHours() : 9;
+  const minutes = existing ? existing.getMinutes() : 0;
+  const next = parseKey(dateKey);
+  next.setHours(hours, minutes, 0, 0);
+  return next.toISOString();
+}
+
 function startOfDay(date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
@@ -1456,6 +1504,12 @@ function isTodayOrFutureDateKey(dateKey) {
   return parseKey(dateKey).getTime() >= startOfDay(new Date()).getTime();
 }
 
+function isTodayOrFutureFollowDate(value) {
+  const date = parseFollowDate(value);
+  if (!date) return false;
+  return startOfDay(date).getTime() >= startOfDay(new Date()).getTime();
+}
+
 function weekday(date) {
   return new Intl.DateTimeFormat("ro-RO", { weekday: "short" }).format(date);
 }
@@ -1466,6 +1520,18 @@ function monthName(date) {
 
 function formatShortDate(date) {
   return new Intl.DateTimeFormat("ro-RO", { day: "numeric", month: "short" }).format(date);
+}
+
+function formatFollowDateTime(value) {
+  const date = parseFollowDate(value);
+  if (!date) return "-";
+  return new Intl.DateTimeFormat("ro-RO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(date);
+}
+
+function formatFollowTime(value) {
+  const date = parseFollowDate(value);
+  if (!date) return "";
+  return new Intl.DateTimeFormat("ro-RO", { hour: "2-digit", minute: "2-digit" }).format(date);
 }
 
 function formatLongDate(date) {
@@ -1479,7 +1545,7 @@ function formatDateTime(value) {
 function averageFollowupDays(leads) {
   const values = leads
     .filter((lead) => lead.firstMessageAt && lead.followDate)
-    .map((lead) => Math.max(0, Math.round((parseKey(lead.followDate).getTime() - new Date(lead.firstMessageAt).getTime()) / DAY_MS)));
+    .map((lead) => Math.max(0, Math.round(((parseFollowDate(lead.followDate)?.getTime() || 0) - new Date(lead.firstMessageAt).getTime()) / DAY_MS)));
   if (!values.length) return 0;
   return Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10;
 }
