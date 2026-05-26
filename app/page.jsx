@@ -995,7 +995,7 @@ function ClientModal({ lead, draft, requiresFollowUp, warning, config, isAdmin, 
   return (
     <div className="dialog-backdrop">
       <section className="client-dialog">
-        <form className="client-modal" onSubmit={(event) => { event.preventDefault(); onSave(); }}>
+        <div className="client-modal">
           <button type="button" className="close-btn" onClick={onClose} aria-label="Inchide">x</button>
           <div className="modal-top">
             <Avatar lead={lead} />
@@ -1072,7 +1072,7 @@ function ClientModal({ lead, draft, requiresFollowUp, warning, config, isAdmin, 
 
           <div className="modal-actions">
             <button type="button" className="danger-btn" onClick={onArchive}>Arhiveaza</button>
-            <button type="submit" className="primary-btn">Salveaza</button>
+            <button type="button" className="primary-btn" onClick={() => onSave()}>Salveaza</button>
           </div>
 
           <ClientHistory lead={lead} lookups={lookups} />
@@ -1088,7 +1088,7 @@ function ClientModal({ lead, draft, requiresFollowUp, warning, config, isAdmin, 
             onSubmit={submitMessage}
           />
           )}
-        </form>
+        </div>
       </section>
     </div>
   );
@@ -1173,10 +1173,14 @@ function MessagesPanel({ lead, draft, state, error, lookups, onChange, onSubmit 
           onKeyDown={handleMessageKeyDown}
           rows={3}
           placeholder="Scrie mesajul pentru client"
-          autoComplete="off"
+          autoComplete="new-password"
           name={`chat-message-${lead.id}`}
           autoSave="off"
           data-form-type="other"
+          data-lpignore="true"
+          data-1p-ignore="true"
+          data-bwignore="true"
+          aria-autocomplete="none"
           autoCorrect="on"
           autoCapitalize="sentences"
           spellCheck="true"
