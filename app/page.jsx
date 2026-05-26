@@ -1161,7 +1161,20 @@ function MessagesPanel({ lead, draft, state, error, lookups, onChange, onSubmit 
       </div>
 
       <div className="message-compose">
-        <textarea value={draft} onChange={(event) => onChange(event.target.value)} onKeyDown={handleMessageKeyDown} rows={3} placeholder="Scrie mesajul pentru client" />
+        <textarea
+          value={draft}
+          onChange={(event) => onChange(event.target.value)}
+          onKeyDown={handleMessageKeyDown}
+          rows={3}
+          placeholder="Scrie mesajul pentru client"
+          autoComplete="off"
+          autoCorrect="on"
+          autoCapitalize="sentences"
+          spellCheck="true"
+          inputMode="text"
+          enterKeyHint="send"
+          aria-label="Mesaj catre client"
+        />
         <div className="message-compose-actions">
           {error && <span className="message-error">{error}</span>}
           {state === "sent" && <span className="message-ok">Trimis</span>}
