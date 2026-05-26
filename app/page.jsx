@@ -1127,6 +1127,12 @@ function MessagesPanel({ lead, draft, state, error, lookups, onChange, onSubmit 
   const messages = [...(lead.messages || [])].sort((left, right) => new Date(left.sentAt || left.createdAt).getTime() - new Date(right.sentAt || right.createdAt).getTime());
   const canSend = Boolean(draft.trim()) && state !== "sending";
 
+  function handleMessageKeyDown(event) {
+    if (event.key !== "Enter" || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) return;
+    event.preventDefault();
+    if (canSend) onSubmit();
+  }
+
   return (
     <section className="modal-section messages-section">
       <div className="comments-head">
@@ -1155,7 +1161,7 @@ function MessagesPanel({ lead, draft, state, error, lookups, onChange, onSubmit 
       </div>
 
       <div className="message-compose">
-        <textarea value={draft} onChange={(event) => onChange(event.target.value)} rows={3} placeholder="Scrie mesajul pentru client" />
+        <textarea value={draft} onChange={(event) => onChange(event.target.value)} onKeyDown={handleMessageKeyDown} rows={3} placeholder="Scrie mesajul pentru client" />
         <div className="message-compose-actions">
           {error && <span className="message-error">{error}</span>}
           {state === "sent" && <span className="message-ok">Trimis</span>}
