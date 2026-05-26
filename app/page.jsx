@@ -1124,8 +1124,13 @@ function ClientHistory({ lead, lookups }) {
 }
 
 function MessagesPanel({ lead, draft, state, error, lookups, onChange, onSubmit }) {
+  const messagesEndRef = useRef(null);
   const messages = [...(lead.messages || [])].sort((left, right) => new Date(left.sentAt || left.createdAt).getTime() - new Date(right.sentAt || right.createdAt).getTime());
   const canSend = Boolean(draft.trim()) && state !== "sending";
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ block: "end" });
+  }, [lead.id, messages.length]);
 
   function handleMessageKeyDown(event) {
     if (event.key !== "Enter" || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) return;
@@ -1157,6 +1162,7 @@ function MessagesPanel({ lead, draft, state, error, lookups, onChange, onSubmit 
             </article>
           );
         })}
+        <span ref={messagesEndRef} aria-hidden="true" />
         {!messages.length && <p className="empty-history">Inca nu exista mesaje salvate pentru acest client.</p>}
       </div>
 
@@ -1168,6 +1174,9 @@ function MessagesPanel({ lead, draft, state, error, lookups, onChange, onSubmit 
           rows={3}
           placeholder="Scrie mesajul pentru client"
           autoComplete="off"
+          name={`chat-message-${lead.id}`}
+          autoSave="off"
+          data-form-type="other"
           autoCorrect="on"
           autoCapitalize="sentences"
           spellCheck="true"
