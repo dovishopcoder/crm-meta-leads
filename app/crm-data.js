@@ -230,7 +230,20 @@ export function buildStats(leads, config = { managers, stages, products, current
     managers: config.managers.map((manager) => {
       const managerCode = manager.code || manager.id;
       const managerLeads = leads.filter((lead) => lead.managerId === managerCode);
-      return [manager.name, managerLeads.length, managerLeads.reduce((sum, lead) => sum + (lead.processedCount || 0), 0), managerLeads.filter((lead) => lead.unread && !lead.archived).length, managerLeads.filter((lead) => lead.archived).length];
+      return [manager.name, managerLeads.filter((lead) => !lead.archived).length, managerLeads.length, managerLeads.filter((lead) => lead.unread && !lead.archived).length, managerLeads.filter((lead) => lead.archived).length];
+    }),
+    managerActivity: config.managers.map((manager) => {
+      const managerCode = manager.code || manager.id;
+      return [
+        manager.name,
+        countManagerProcessed(leads, managerCode),
+        countManagerOutgoingMessages(leads, managerCode),
+        countManagerComments(leads, managerCode),
+        countManagerStageChanges(leads, managerCode),
+        countManagerInterestChanges(leads, managerCode),
+        countManagerProducts(leads, managerCode),
+        countManagerArchiveActions(leads, managerCode)
+      ];
     }),
     stages: config.stages.map((stage) => {
       const stageLeads = leads.filter((lead) => lead.stage === stage.id);
@@ -246,6 +259,39 @@ export function buildStats(leads, config = { managers, stages, products, current
       return [interest.name, activeLeads.length, historyCount];
     })
   };
+}
+
+function countManagerProcessed(leads, managerCode) {
+  return leads.reduce((sum, lead) => {
+    const processedEvents = (lead.activity || []).filter((entry) => entry.type === "processed");
+    const managerEvents = processedEvents.filter((entry) => entry.managerId === managerCode).length;
+    if (processedEvents.length) return sum + managerEvents;
+    return sum + (lead.managerId === managerCode ? lead.processedCount || 0 : 0);
+  }, 0);
+}
+
+function countManagerOutgoingMessages(leads, managerCode) {
+  return leads.flatMap((lead) => lead.messages || []).filter((message) => message.managerId === managerCode && message.direction === "outgoing").length;
+}
+
+function countManagerComments(leads, managerCode) {
+  return leads.flatMap((lead) => lead.comments || []).filter((comment) => comment.managerId === managerCode).length;
+}
+
+function countManagerStageChanges(leads, managerCode) {
+  return leads.flatMap((lead) => lead.tagHistory || []).filter((entry) => entry.managerId === managerCode).length;
+}
+
+function countManagerInterestChanges(leads, managerCode) {
+  return leads.flatMap((lead) => lead.currentInterestHistory || []).filter((entry) => entry.managerId === managerCode).length;
+}
+
+function countManagerProducts(leads, managerCode) {
+  return leads.flatMap((lead) => lead.products || []).filter((product) => product.managerId === managerCode).length;
+}
+
+function countManagerArchiveActions(leads, managerCode) {
+  return leads.flatMap((lead) => lead.activity || []).filter((entry) => entry.managerId === managerCode && ["archived", "restored"].includes(entry.type)).length;
 }
 
 export function managerFor(id) {

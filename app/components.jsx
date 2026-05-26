@@ -91,7 +91,8 @@ export function StatsPanel({ stats, showManagerStats = true }) {
         {stats.cards.map((card) => <article key={card.label} className="stat-card"><span>{card.label}</span><strong>{card.value}</strong></article>)}
       </div>
       <div className="stats-layout">
-        {showManagerStats && <StatsTable title="Manageri" columns={["Manager", "Lead-uri", "Prelucrari", "Necitite", "Arhivate"]} rows={stats.managers} />}
+        {showManagerStats && <StatsTable title="Activitate manageri" columns={["Manager", "Prelucrari", "Mesaje", "Comentarii", "Etape", "Interese", "Produse", "Arh./React."]} rows={stats.managerActivity || []} />}
+        {showManagerStats && <StatsTable title="Lead-uri atribuite" columns={["Manager", "Active", "Total", "Necitite", "Arhivate"]} rows={stats.managers} />}
         <StatsTable title="Etape / Tags" columns={["Etapa", "Lead-uri", "Prelucrari"]} rows={stats.stages} />
         <StatsTable title="Interes actual" columns={["Interes", "Lead-uri active", "Schimbari in istoric"]} rows={stats.currentInterests || []} />
         <StatsTable title="Produse propuse" columns={["Produs", "Propuneri", "Acceptate"]} rows={stats.products} />

@@ -342,13 +342,13 @@ export async function loadSupabaseLeads() {
   const refs = await ensureReferenceData();
   let { data, error } = await supabase
     .from("leads")
-    .select("*, lead_tags(tag), lead_products(status, proposed_at, product_id, products(code, name)), lead_stage_history(from_stage_id, to_stage_id, manager_id, changed_at), lead_interest_history(interest_code, changed_at, manager_id), lead_comments(comment, manager_id, created_at), lead_messages(id, direction, body, manager_id, external_id, status, error, sent_at, created_at)")
+    .select("*, lead_tags(tag), lead_products(status, proposed_at, manager_id, product_id, products(code, name)), lead_stage_history(from_stage_id, to_stage_id, manager_id, changed_at), lead_interest_history(interest_code, changed_at, manager_id), lead_comments(comment, manager_id, created_at), lead_messages(id, direction, body, manager_id, external_id, status, error, sent_at, created_at), lead_activity(type, payload, manager_id, created_at)")
     .order("created_at", { ascending: true });
 
   if (error && isMissingLeadMessagesError(error)) {
     const fallback = await supabase
       .from("leads")
-      .select("*, lead_tags(tag), lead_products(status, proposed_at, product_id, products(code, name)), lead_stage_history(from_stage_id, to_stage_id, manager_id, changed_at), lead_interest_history(interest_code, changed_at, manager_id), lead_comments(comment, manager_id, created_at)")
+      .select("*, lead_tags(tag), lead_products(status, proposed_at, manager_id, product_id, products(code, name)), lead_stage_history(from_stage_id, to_stage_id, manager_id, changed_at), lead_interest_history(interest_code, changed_at, manager_id), lead_comments(comment, manager_id, created_at), lead_activity(type, payload, manager_id, created_at)")
       .order("created_at", { ascending: true });
     data = fallback.data;
     error = fallback.error;
@@ -357,7 +357,7 @@ export async function loadSupabaseLeads() {
   if (error && isMissingTableError(error)) {
     const fallback = await supabase
       .from("leads")
-      .select("*, lead_tags(tag), lead_products(status, proposed_at, product_id, products(code, name))")
+      .select("*, lead_tags(tag), lead_products(status, proposed_at, manager_id, product_id, products(code, name))")
       .order("created_at", { ascending: true });
     data = fallback.data;
     error = fallback.error;
@@ -465,6 +465,7 @@ export async function saveSupabaseLead(lead, options = {}) {
   await saveLeadStageHistory(savedId, lead.tagHistory || [], refs);
   await saveLeadInterestHistory(savedId, lead.currentInterestHistory || [], refs);
   await saveLeadComments(savedId, lead.comments || [], refs);
+  await saveLeadActivity(savedId, lead.activity || [], refs);
   return { ...lead, id: savedId, metaContactId: leadRow.meta_contact_id };
 }
 
@@ -628,9 +629,15 @@ function fromSupabaseLead(row, refs) {
       id: item.products?.code || refs.productUuidToCode[item.product_id],
       status: item.status,
       proposedAt: item.proposed_at,
-      managerId: refs.managerUuidToCode[row.manager_id] || "unassigned"
+      managerId: refs.managerUuidToCode[item.manager_id] || "unassigned"
     })).filter((item) => item.id),
-    activity: [],
+    activity: (row.lead_activity || []).map((activity) => ({
+      ...(activity.payload || {}),
+      type: activity.type,
+      at: activity.created_at,
+      managerId: refs.managerUuidToCode[activity.manager_id] || activity.payload?.managerId || "unassigned",
+      persisted: true
+    })),
     managerId: refs.managerUuidToCode[row.manager_id] || "unassigned",
     priority: row.priority,
     tags: (row.lead_tags || []).map((tag) => tag.tag),
@@ -754,6 +761,25 @@ async function saveLeadComments(leadId, comments, refs) {
 
   if (!rows.length) return;
   const { error } = await supabase.from("lead_comments").insert(rows);
+  if (error) {
+    if (isMissingTableError(error)) return;
+    throw error;
+  }
+}
+
+async function saveLeadActivity(leadId, activity, refs) {
+  const rows = activity
+    .filter((entry) => entry.type && !entry.persisted)
+    .map((entry) => ({
+      lead_id: leadId,
+      manager_id: refs.managerCodeToUuid[entry.managerId] || null,
+      type: entry.type,
+      payload: Object.fromEntries(Object.entries(entry).filter(([key]) => !["type", "at", "persisted"].includes(key))),
+      created_at: entry.at || new Date().toISOString()
+    }));
+
+  if (!rows.length) return;
+  const { error } = await supabase.from("lead_activity").insert(rows);
   if (error) {
     if (isMissingTableError(error)) return;
     throw error;
