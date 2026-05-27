@@ -1332,11 +1332,13 @@ label textarea {
   }
 
   .crm-top-menu {
+    grid-row: 2;
     padding: 12px 14px 0;
     border-bottom: 1px solid var(--line);
   }
 
   .mobile-crm-tabs {
+    grid-row: 1;
     position: sticky;
     top: 0;
     z-index: 10;
@@ -1428,7 +1430,7 @@ label textarea {
   }
 
   .crm-top-menu {
-    padding: 10px 14px 8px;
+    padding: 7px 14px 7px;
   }
 
   .crm-top-menu .app-nav {
@@ -1443,6 +1445,7 @@ label textarea {
     order: -1;
     grid-column: 1 / -1;
     justify-self: center;
+    display: none;
   }
 
   .nav-brand img {

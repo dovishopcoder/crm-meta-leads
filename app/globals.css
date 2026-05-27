@@ -776,6 +776,10 @@
     margin-bottom: 2px;
   }
 
+  .crm-top-menu .nav-brand {
+    display: none;
+  }
+
   .nav-brand img {
     height: 34px;
     max-width: min(170px, 100%);
