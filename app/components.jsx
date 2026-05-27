@@ -97,7 +97,7 @@ export function StatsPanel({ stats, showManagerStats = true }) {
         <StatsTable title="Palnie biserica" columns={["Pas", "Lead-uri", "Rata din invitati"]} rows={stats.churchFunnel || []} />
         <StatsTable title="Palnie studiu biblic" columns={["Pas", "Lead-uri", "Rata din propuneri"]} rows={stats.studyFunnel || []} />
         <StatsTable title="Need Category" columns={["Need", "Active", "Total", "Schimbari"]} rows={stats.needCategories || []} />
-        <StatsTable title="Etape / Tags" columns={["Etapa", "Active", "Total", "Rata din total"]} rows={stats.stages} />
+        <StatsTable title="Etape / Tags" columns={["Etapa", "Active", "Total", "Prelucrari", "Rata din total"]} rows={stats.stages} />
         <StatsTable title="Interes actual" columns={["Interes", "Lead-uri active", "Schimbari in istoric"]} rows={stats.currentInterests || []} />
         <StatsTable title="Produse propuse" columns={["Produs", "Propuneri", "Acceptate"]} rows={stats.products} />
       </div>

@@ -274,7 +274,7 @@ export function buildStats(leads, config = { managers, stages, products, current
     stages: (config.stages || stages).map((stage) => {
       const stageLeads = leads.filter((lead) => lead.stage === stage.id);
       const activeStageLeads = stageLeads.filter((lead) => !lead.archived);
-      return [stage.name, activeStageLeads.length, stageLeads.length, percent(stageLeads.length, total)];
+      return [stage.name, activeStageLeads.length, stageLeads.length, stageLeads.reduce((sum, lead) => sum + (lead.processedCount || 0), 0), percent(stageLeads.length, total)];
     }),
     products: config.products.map((product) => {
       const proposed = leads.flatMap((lead) => lead.products || []).filter((item) => item.id === product.id);
