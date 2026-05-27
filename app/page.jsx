@@ -1416,6 +1416,7 @@ function ClientHistory({ lead, lookups }) {
 
 function MessagesPanel({ lead, draft, state, error, lookups, onChange, onSubmit }) {
   const messagesEndRef = useRef(null);
+  const [mobileInputMode, setMobileInputMode] = useState(false);
   const messages = [...(lead.messages || [])].sort((left, right) => new Date(left.sentAt || left.createdAt).getTime() - new Date(right.sentAt || right.createdAt).getTime());
   const canSend = Boolean(draft.trim()) && state !== "sending";
 
@@ -1423,7 +1424,19 @@ function MessagesPanel({ lead, draft, state, error, lookups, onChange, onSubmit 
     messagesEndRef.current?.scrollIntoView({ block: "end" });
   }, [lead.id, messages.length]);
 
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 700px), (pointer: coarse)");
+    function updateMode() {
+      setMobileInputMode(query.matches);
+    }
+
+    updateMode();
+    query.addEventListener("change", updateMode);
+    return () => query.removeEventListener("change", updateMode);
+  }, []);
+
   function handleMessageKeyDown(event) {
+    if (mobileInputMode) return;
     if (event.key !== "Enter" || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) return;
     event.preventDefault();
     if (canSend) onSubmit();
@@ -1475,7 +1488,7 @@ function MessagesPanel({ lead, draft, state, error, lookups, onChange, onSubmit 
           autoCapitalize="sentences"
           spellCheck="true"
           inputMode="text"
-          enterKeyHint="send"
+          enterKeyHint={mobileInputMode ? "enter" : "send"}
           aria-label="Mesaj catre client"
         />
         <div className="message-compose-actions">
