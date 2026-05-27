@@ -623,6 +623,7 @@ export default function HomePage() {
     if (!options.metaLinkOnly && !canCloseSelected()) return;
 
     const now = toIso(new Date());
+    const actorManagerId = currentManager?.code || draft.managerId || "unassigned";
     updateLead(selectedLead.id, (lead) => {
       const previousStage = lead.stage || "new";
       const previousInterest = lead.currentInterest || "";
@@ -631,7 +632,7 @@ export default function HomePage() {
       const previousProducts = new Set((lead.products || []).map((item) => item.id));
       const selectedProducts = draft.products.map((productId) => {
         const existing = (lead.products || []).find((item) => item.id === productId);
-        return existing || { id: productId, status: "proposed", proposedAt: now, managerId: draft.managerId };
+        return existing || { id: productId, status: "proposed", proposedAt: now, managerId: actorManagerId };
       });
 
       lead.metaUrl = draft.metaUrl.trim() || lead.metaUrl;
@@ -671,12 +672,12 @@ export default function HomePage() {
       lead.lastProcessedAt = now;
 
       if (previousStage !== lead.stage) {
-        lead.tagHistory = [...(lead.tagHistory || []), { from: previousStage, to: lead.stage, changedAt: now, managerId: draft.managerId }];
+        lead.tagHistory = [...(lead.tagHistory || []), { from: previousStage, to: lead.stage, changedAt: now, managerId: actorManagerId }];
       }
       if (previousInterest !== lead.currentInterest && lead.currentInterest) {
         lead.currentInterestHistory = [
           ...(lead.currentInterestHistory || []),
-          { interest: lead.currentInterest, changedAt: now, managerId: draft.managerId }
+          { interest: lead.currentInterest, changedAt: now, managerId: actorManagerId }
         ];
       }
       const currentNeedCategories = new Set(lead.needCategories || []);
@@ -685,14 +686,14 @@ export default function HomePage() {
       if (!(lead.needCategoryHistory || []).length && previousNeedCategories.size) {
         lead.needCategoryHistory = [
           ...(lead.needCategoryHistory || []),
-          ...[...previousNeedCategories].map((category) => ({ category, action: "added", changedAt: lead.createdAt || now, managerId: draft.managerId }))
+          ...[...previousNeedCategories].map((category) => ({ category, action: "added", changedAt: lead.createdAt || now, managerId: actorManagerId }))
         ];
       }
       if (addedNeedCategories.length || removedNeedCategories.length) {
         lead.needCategoryHistory = [
           ...(lead.needCategoryHistory || []),
-          ...addedNeedCategories.map((category) => ({ category, action: "added", changedAt: now, managerId: draft.managerId })),
-          ...removedNeedCategories.map((category) => ({ category, action: "removed", changedAt: now, managerId: draft.managerId }))
+          ...addedNeedCategories.map((category) => ({ category, action: "added", changedAt: now, managerId: actorManagerId })),
+          ...removedNeedCategories.map((category) => ({ category, action: "removed", changedAt: now, managerId: actorManagerId }))
         ];
       }
 
@@ -701,7 +702,7 @@ export default function HomePage() {
         {
           type: "processed",
           at: now,
-          managerId: draft.managerId,
+          managerId: actorManagerId,
           stage: lead.stage,
           followDate: lead.followDate,
           followTime: lead.followTime,
