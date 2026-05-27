@@ -225,6 +225,7 @@ export default function HomePage() {
   const [activeFilter, setActiveFilter] = useState("all");
   const [managerFilter, setManagerFilter] = useState("all");
   const [onlyMyLeads, setOnlyMyLeads] = useState(false);
+  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [search, setSearch] = useState("");
   const [view, setView] = useState("week");
   const [cursorDate, setCursorDate] = useState(startOfDay(new Date()));
@@ -381,7 +382,8 @@ export default function HomePage() {
     const currentManagerCode = currentManager?.code || FALLBACK_MANAGER_ID;
     return leads
       .filter((lead) => {
-        if (lead.archived || !lead.unread) return false;
+        if (lead.archived) return false;
+        if (showUnreadOnly && !lead.unread) return false;
         if (activeFilter !== "all" && lead.platform !== activeFilter) return false;
         if (onlyMyLeads && lead.managerId !== currentManagerCode && lead.managerId !== "unassigned") return false;
         if (managerFilter !== "all" && lead.managerId !== managerFilter) return false;
@@ -391,7 +393,7 @@ export default function HomePage() {
         return haystack.includes(search.toLowerCase());
       })
       .sort((left, right) => leadInboxTime(right) - leadInboxTime(left));
-  }, [activeFilter, currentManager, crmConfig, leads, managerFilter, onlyMyLeads, search]);
+  }, [activeFilter, currentManager, crmConfig, leads, managerFilter, onlyMyLeads, search, showUnreadOnly]);
 
   const visibleDates = useMemo(() => getVisibleDates(cursorDate, view), [cursorDate, view]);
   const selectedLead = leads.find((lead) => lead.id === selectedId);
@@ -403,12 +405,14 @@ export default function HomePage() {
   const activeHooks = (crmConfig.hooks || hooks).filter((hook) => hook.active);
   const activeCurrentInterests = (crmConfig.currentInterests || currentInterests).filter((interest) => interest.active);
   const activeNeedCategories = (crmConfig.needCategories || needCategories).filter((category) => category.active);
+  const unreadCount = leads.filter((lead) => lead.unread && !lead.archived).length;
   const filtersCount = [activeFilter !== "all", managerFilter !== "all", onlyMyLeads].filter(Boolean).length;
-  const filterSummary = [
+  const filterSummaryParts = [
     activeFilter !== "all" ? platformLabel(activeFilter) : "",
     managerFilter !== "all" ? managerForConfig(managerFilter).name : "",
     onlyMyLeads ? "Ale mele" : ""
-  ].filter(Boolean).join(" В· ") || "Toate lead-urile";
+  ].filter(Boolean);
+  const filterSummary = filterSummaryParts.length ? filterSummaryParts.join(" · ") : "Toate";
 
   useEffect(() => {
     if (!loaded || selectedId) return;
@@ -786,7 +790,7 @@ export default function HomePage() {
 
       <div ref={mobileTabsRef} className="mobile-crm-tabs" role="tablist" aria-label="Interfete CRM">
         <button type="button" className={mobileView === "inbox" ? "active" : ""} onClick={() => switchMobileView("inbox")}>
-          Necitite
+          Conversatii
         </button>
         <button type="button" className={mobileView === "calendar" ? "active" : ""} onClick={() => switchMobileView("calendar")}>
           Calendar
@@ -797,7 +801,7 @@ export default function HomePage() {
         <div className="panel-head">
           <div>
             <p className="eyebrow">Meta Inbox</p>
-            <h1>Lead-uri noi</h1>
+            <h1>Conversatii</h1>
           </div>
           <div className="panel-head-actions">
             <span className="count-badge">{filteredLeads.length}</span>
@@ -809,47 +813,55 @@ export default function HomePage() {
           <input value={search} onChange={(event) => setSearch(event.target.value)} type="search" placeholder="Cauta dupa nume, tag sau platforma" />
         </div>
 
-        <div className="filter-dropdown">
-          <button type="button" className="filter-toggle" onClick={() => setFiltersOpen((open) => !open)} aria-expanded={filtersOpen}>
-            <span>
-              <strong>Filtre</strong>
-              <small>{filterSummary}</small>
-            </span>
-            {filtersCount > 0 && <em>{filtersCount}</em>}
-            <b>{filtersOpen ? "Ascunde" : "Alege"}</b>
-          </button>
+        <div className="inbox-filter-row">
+          <div className="filter-dropdown">
+            <button type="button" className="filter-toggle" onClick={() => setFiltersOpen((open) => !open)} aria-expanded={filtersOpen}>
+              <span>
+                <strong>Filtre</strong>
+                <small>{filterSummary}</small>
+              </span>
+              {filtersCount > 0 && <em>{filtersCount}</em>}
+              <b>{filtersOpen ? "Ascunde" : "Alege"}</b>
+            </button>
 
-          {filtersOpen && (
-            <div className="filter-panel">
-              <div className="quick-filters" aria-label="Filtre lead-uri">
-                {["all", "facebook", "instagram"].map((filter) => (
-                  <button key={filter} className={`chip ${activeFilter === filter ? "active" : ""}`} onClick={() => { setActiveFilter(filter); setFiltersOpen(false); }}>
-                    {filter === "all" ? "Toate" : platformLabel(filter)}
-                  </button>
-                ))}
-              </div>
+            {filtersOpen && (
+              <div className="filter-panel">
+                <div className="quick-filters" aria-label="Filtre lead-uri">
+                  {["all", "facebook", "instagram"].map((filter) => (
+                    <button key={filter} className={`chip ${activeFilter === filter ? "active" : ""}`} onClick={() => { setActiveFilter(filter); setFiltersOpen(false); }}>
+                      {filter === "all" ? "Toate" : platformLabel(filter)}
+                    </button>
+                  ))}
+                </div>
 
-              {currentManager?.role === "admin" && (
-                <label className="compact-label">
-                  Manager
-                  <select value={managerFilter} onChange={(event) => { setManagerFilter(event.target.value); setFiltersOpen(false); }}>
-                    <option value="all">Toti managerii</option>
-                    {activeManagers.map((manager) => (
-                      <option key={manager.code} value={manager.code}>{manager.name}</option>
-                    ))}
-                  </select>
+                {currentManager?.role === "admin" && (
+                  <label className="compact-label">
+                    Manager
+                    <select value={managerFilter} onChange={(event) => { setManagerFilter(event.target.value); setFiltersOpen(false); }}>
+                      <option value="all">Toti managerii</option>
+                      {activeManagers.map((manager) => (
+                        <option key={manager.code} value={manager.code}>{manager.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+
+                <label className="toggle-row">
+                  <input type="checkbox" checked={onlyMyLeads} onChange={(event) => { setOnlyMyLeads(event.target.checked); setFiltersOpen(false); }} />
+                  <span>{currentManager?.role === "admin" ? "Filtreaza pe mine" : "Doar lead-urile mele"}</span>
                 </label>
-              )}
+              </div>
+            )}
+          </div>
 
-              <label className="toggle-row">
-                <input type="checkbox" checked={onlyMyLeads} onChange={(event) => { setOnlyMyLeads(event.target.checked); setFiltersOpen(false); }} />
-                <span>{currentManager?.role === "admin" ? "Filtreaza pe mine" : "Doar lead-urile mele"}</span>
-              </label>
-            </div>
-          )}
+          <label className={showUnreadOnly ? "unread-filter-toggle active" : "unread-filter-toggle"}>
+            <input type="checkbox" checked={showUnreadOnly} onChange={(event) => setShowUnreadOnly(event.target.checked)} />
+            <span>Necitite</span>
+            <strong>{unreadCount}</strong>
+          </label>
         </div>
 
-        <section className="lead-list" aria-label="Lista chat-uri necitite">
+        <section className="lead-list" aria-label="Lista conversatii">
           {filteredLeads.map((lead) => (
             <LeadCard key={lead.id} lead={lead} lookups={{ managerForConfig, stageForConfig, productForConfig, statusForConfig }} onOpen={() => openLead(lead, "inbox")} onDragStart={(event) => event.dataTransfer.setData("text/plain", lead.id)} />
           ))}
