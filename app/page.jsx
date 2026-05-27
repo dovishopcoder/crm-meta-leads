@@ -1173,17 +1173,17 @@ function ClientModal({ lead, draft, requiresFollowUp, warning, config, isAdmin, 
           </div>
 
           <div className="field-grid">
+            <label>Etapa<select value={draft.stage} onChange={(event) => update("stage", event.target.value)}>{config.stages.map((stage) => <option key={stage.id} value={stage.id}>{stage.name}</option>)}</select></label>
+            <label>Interes actual<select value={draft.currentInterest} onChange={(event) => update("currentInterest", event.target.value)}><option value="">Neindicat</option>{config.currentInterests.map((interest) => <option key={interest.id} value={interest.id}>{interest.name}</option>)}</select></label>
+          </div>
+
+          <div className="field-grid">
             <label>Prioritate<select value={draft.priority} onChange={(event) => update("priority", event.target.value)}><option value="normal">Normala</option><option value="high">Inalta</option><option value="low">Joasa</option></select></label>
             <NeedCategorySelector
               categories={config.needCategories}
               selected={draft.needCategories || []}
               onToggle={toggleNeedCategory}
             />
-          </div>
-
-          <div className="field-grid">
-            <label>Etapa<select value={draft.stage} onChange={(event) => update("stage", event.target.value)}>{config.stages.map((stage) => <option key={stage.id} value={stage.id}>{stage.name}</option>)}</select></label>
-            <label>Interes actual<select value={draft.currentInterest} onChange={(event) => update("currentInterest", event.target.value)}><option value="">Neindicat</option>{config.currentInterests.map((interest) => <option key={interest.id} value={interest.id}>{interest.name}</option>)}</select></label>
           </div>
 
           <div className="field-grid">
