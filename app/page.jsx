@@ -219,6 +219,22 @@ export default function HomePage() {
   const initialMobileScrollDone = useRef(false);
   const calendarGridRef = useRef(null);
 
+  function focusMobileTabs() {
+    if (typeof window === "undefined" || window.innerWidth > 900) return;
+
+    window.requestAnimationFrame(() => {
+      const tabsTop = mobileTabsRef.current?.getBoundingClientRect().top ?? 0;
+      const targetTop = Math.max(0, window.scrollY + tabsTop);
+      window.scrollTo({ top: targetTop, behavior: "smooth" });
+    });
+  }
+
+  function switchMobileView(nextView) {
+    setMobileView(nextView);
+    setFiltersOpen(false);
+    focusMobileTabs();
+  }
+
   async function refreshCrmData({ keepManager = false, reason = "" } = {}) {
     try {
       if (!keepManager) {
@@ -285,11 +301,7 @@ export default function HomePage() {
     if (!loaded || initialMobileScrollDone.current || window.innerWidth > 900) return;
 
     initialMobileScrollDone.current = true;
-    window.requestAnimationFrame(() => {
-      const tabsTop = mobileTabsRef.current?.getBoundingClientRect().top ?? 0;
-      const targetTop = Math.max(0, window.scrollY + tabsTop);
-      window.scrollTo({ top: targetTop, behavior: "auto" });
-    });
+    focusMobileTabs();
   }, [loaded]);
 
   useEffect(() => {
@@ -693,10 +705,10 @@ export default function HomePage() {
       </div>
 
       <div ref={mobileTabsRef} className="mobile-crm-tabs" role="tablist" aria-label="Interfete CRM">
-        <button type="button" className={mobileView === "inbox" ? "active" : ""} onClick={() => setMobileView("inbox")}>
+        <button type="button" className={mobileView === "inbox" ? "active" : ""} onClick={() => switchMobileView("inbox")}>
           Necitite
         </button>
-        <button type="button" className={mobileView === "calendar" ? "active" : ""} onClick={() => setMobileView("calendar")}>
+        <button type="button" className={mobileView === "calendar" ? "active" : ""} onClick={() => switchMobileView("calendar")}>
           Calendar
         </button>
       </div>
