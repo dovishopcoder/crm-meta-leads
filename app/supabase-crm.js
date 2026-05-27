@@ -620,7 +620,8 @@ function fromSupabaseLead(row, refs) {
     hook: row.hook || "",
     currentInterest: row.current_interest || "",
     needCategory: row.need_category || "",
-    needCategories: (row.lead_need_categories || [])
+    needCategories: [...(row.lead_need_categories || [])]
+      .sort((left, right) => new Date(left.selected_at || 0).getTime() - new Date(right.selected_at || 0).getTime())
       .map((item) => item.category_code)
       .filter(Boolean)
       .concat(row.need_category && !(row.lead_need_categories || []).some((item) => item.category_code === row.need_category) ? [row.need_category] : []),
@@ -745,11 +746,21 @@ async function saveLeadNeedCategories(leadId, selectedCategories, refs, lead) {
   const uniqueCategories = [...new Set((selectedCategories || []).filter(Boolean))];
   if (!uniqueCategories.length) return;
 
+  const firstSelectedAtByCategory = new Map();
+  [...(lead.needCategoryHistory || [])]
+    .filter((entry) => entry.category && entry.action !== "removed")
+    .sort((left, right) => new Date(left.changedAt || 0).getTime() - new Date(right.changedAt || 0).getTime())
+    .forEach((entry) => {
+      if (!firstSelectedAtByCategory.has(entry.category)) {
+        firstSelectedAtByCategory.set(entry.category, entry.changedAt);
+      }
+    });
+
   const rows = uniqueCategories.map((category) => ({
     lead_id: leadId,
     category_code: category,
     manager_id: refs.managerCodeToUuid[lead.managerId] || null,
-    selected_at: new Date().toISOString()
+    selected_at: firstSelectedAtByCategory.get(category) || new Date().toISOString()
   }));
 
   const { error } = await supabase.from("lead_need_categories").insert(rows);

@@ -682,6 +682,12 @@ export default function HomePage() {
       const currentNeedCategories = new Set(lead.needCategories || []);
       const addedNeedCategories = [...currentNeedCategories].filter((category) => !previousNeedCategories.has(category));
       const removedNeedCategories = [...previousNeedCategories].filter((category) => !currentNeedCategories.has(category));
+      if (!(lead.needCategoryHistory || []).length && previousNeedCategories.size) {
+        lead.needCategoryHistory = [
+          ...(lead.needCategoryHistory || []),
+          ...[...previousNeedCategories].map((category) => ({ category, action: "added", changedAt: lead.createdAt || now, managerId: draft.managerId }))
+        ];
+      }
       if (addedNeedCategories.length || removedNeedCategories.length) {
         lead.needCategoryHistory = [
           ...(lead.needCategoryHistory || []),
@@ -1095,13 +1101,15 @@ function ClientModal({ lead, draft, requiresFollowUp, warning, config, isAdmin, 
   }
 
   function toggleNeedCategory(categoryId) {
-    const selected = new Set(draft.needCategories || []);
-    if (selected.has(categoryId)) {
-      selected.delete(categoryId);
-    } else {
-      selected.add(categoryId);
-    }
-    update("needCategories", [...selected]);
+    onChange((currentDraft) => {
+      const selected = new Set(currentDraft.needCategories || []);
+      if (selected.has(categoryId)) {
+        selected.delete(categoryId);
+      } else {
+        selected.add(categoryId);
+      }
+      return { ...currentDraft, needCategories: [...selected] };
+    });
   }
 
   async function submitMessage(event) {
@@ -1233,7 +1241,13 @@ function NeedCategorySelector({ categories, selected, onToggle }) {
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef(null);
   const selectedSet = new Set(selected || []);
-  const selectedCategories = categories.filter((category) => selectedSet.has(category.id));
+  const selectedCategories = (selected || [])
+    .map((categoryId) => categories.find((category) => category.id === categoryId))
+    .filter(Boolean);
+  const orderedCategories = [
+    ...selectedCategories,
+    ...categories.filter((category) => !selectedSet.has(category.id))
+  ];
   const summary = selectedCategories.length
     ? selectedCategories.map((category) => category.name).join(", ")
     : "Neindicat";
@@ -1267,19 +1281,9 @@ function NeedCategorySelector({ categories, selected, onToggle }) {
         <span className={selectedCategories.length ? "need-category-summary" : "need-category-summary empty"}>{summary}</span>
         <span className="need-category-count">{selectedCategories.length || 0}</span>
       </button>
-      {selectedCategories.length > 0 && (
-        <div className="need-category-active" aria-live="polite">
-          {selectedCategories.map((category, index) => (
-            <span key={category.id} className="need-category-pill active">
-              {index === 0 && <small>prima</small>}
-              {category.name}
-            </span>
-          ))}
-        </div>
-      )}
       {open && (
         <div className="need-category-options" role="group" aria-label="Need Category">
-          {categories.map((category) => {
+          {orderedCategories.map((category, index) => {
             const isSelected = selectedSet.has(category.id);
             return (
               <button
@@ -1290,7 +1294,7 @@ function NeedCategorySelector({ categories, selected, onToggle }) {
                 aria-pressed={isSelected}
               >
                 <span>{category.name}</span>
-                {isSelected && <span className="need-category-check">Selectat</span>}
+                {isSelected && <span className="need-category-check">{index === 0 ? "Prima" : "Selectat"}</span>}
               </button>
             );
           })}
