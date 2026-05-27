@@ -259,13 +259,21 @@ label textarea {
 }
 
 .filter-toggle span {
-  display: grid;
-  gap: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
   min-width: 0;
 }
 
 .filter-toggle strong {
+  flex: 0 0 auto;
   font-size: 12px;
+}
+
+.filter-toggle strong::after {
+  content: "·";
+  margin-left: 5px;
+  color: var(--muted);
 }
 
 .filter-toggle small {
