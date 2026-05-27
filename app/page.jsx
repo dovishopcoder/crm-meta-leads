@@ -1230,40 +1230,72 @@ function ClientModal({ lead, draft, requiresFollowUp, warning, config, isAdmin, 
 }
 
 function NeedCategorySelector({ categories, selected, onToggle }) {
+  const [open, setOpen] = useState(false);
+  const dropdownRef = useRef(null);
   const selectedSet = new Set(selected || []);
   const selectedCategories = categories.filter((category) => selectedSet.has(category.id));
+  const summary = selectedCategories.length
+    ? selectedCategories.map((category) => category.name).join(", ")
+    : "Neindicat";
+
+  useEffect(() => {
+    function handlePointerDown(event) {
+      if (!dropdownRef.current?.contains(event.target)) setOpen(false);
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") setOpen(false);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 
   return (
-    <div className="need-category-field">
+    <div className="need-category-field" ref={dropdownRef}>
       <span className="field-label">Need Category</span>
-      <div className="need-category-active" aria-live="polite">
-        {selectedCategories.length ? (
-          selectedCategories.map((category, index) => (
+      <button
+        type="button"
+        className={open ? "need-category-trigger open" : "need-category-trigger"}
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+      >
+        <span className={selectedCategories.length ? "need-category-summary" : "need-category-summary empty"}>{summary}</span>
+        <span className="need-category-count">{selectedCategories.length || 0}</span>
+      </button>
+      {selectedCategories.length > 0 && (
+        <div className="need-category-active" aria-live="polite">
+          {selectedCategories.map((category, index) => (
             <span key={category.id} className="need-category-pill active">
               {index === 0 && <small>prima</small>}
               {category.name}
             </span>
-          ))
-        ) : (
-          <span className="need-category-empty">Neindicat</span>
-        )}
-      </div>
-      <div className="need-category-options" role="group" aria-label="Need Category">
-        {categories.map((category) => {
-          const isSelected = selectedSet.has(category.id);
-          return (
-            <button
-              key={category.id}
-              type="button"
-              className={isSelected ? "need-category-option selected" : "need-category-option"}
-              onClick={() => onToggle(category.id)}
-              aria-pressed={isSelected}
-            >
-              {category.name}
-            </button>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
+      {open && (
+        <div className="need-category-options" role="group" aria-label="Need Category">
+          {categories.map((category) => {
+            const isSelected = selectedSet.has(category.id);
+            return (
+              <button
+                key={category.id}
+                type="button"
+                className={isSelected ? "need-category-option selected" : "need-category-option"}
+                onClick={() => onToggle(category.id)}
+                aria-pressed={isSelected}
+              >
+                <span>{category.name}</span>
+                {isSelected && <span className="need-category-check">Selectat</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
