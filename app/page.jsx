@@ -1166,7 +1166,7 @@ function ClientModal({ lead, draft, requiresFollowUp, warning, config, isAdmin, 
           </div>
 
           <div className="field-grid">
-            <label className="follow-date-field">Data follow-up<input className="follow-date-input" value={draft.followDate} onChange={(event) => update("followDate", event.target.value)} type="date" /></label>
+            <FollowDatePicker value={draft.followDate} onChange={(value) => update("followDate", value)} />
             <div className="time-select-grid">
               <label>Ora<select value={draft.followHour} onChange={(event) => updateFollowHour(event.target.value)}><option value="">Fara ora</option>{FOLLOW_HOUR_OPTIONS.map((hour) => <option key={hour} value={hour}>{hour}</option>)}</select></label>
               <label>Minute<select value={draft.followMinute} onChange={(event) => updateFollowMinute(event.target.value)} disabled={!draft.followHour}>{FOLLOW_MINUTE_OPTIONS.map((minute) => <option key={minute} value={minute}>{minute}</option>)}</select></label>
@@ -1234,6 +1234,86 @@ function ClientModal({ lead, draft, requiresFollowUp, warning, config, isAdmin, 
           )}
         </div>
       </section>
+    </div>
+  );
+}
+
+function FollowDatePicker({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const pickerRef = useRef(null);
+  const selectedDate = parseFollowDate(value);
+  const [viewDate, setViewDate] = useState(selectedDate || new Date());
+  const monthStart = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
+  const gridStart = addDays(monthStart, -((monthStart.getDay() + 6) % 7));
+  const dayCells = Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
+
+  useEffect(() => {
+    if (selectedDate) setViewDate(selectedDate);
+  }, [value]);
+
+  useEffect(() => {
+    function handlePointerDown(event) {
+      if (!pickerRef.current?.contains(event.target)) setOpen(false);
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") setOpen(false);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  function chooseDate(date) {
+    onChange(toDateKey(date));
+    setOpen(false);
+  }
+
+  return (
+    <div className="follow-date-field" ref={pickerRef}>
+      <span className="field-label">Data follow-up</span>
+      <button type="button" className={open ? "follow-date-trigger open" : "follow-date-trigger"} onClick={() => setOpen((state) => !state)} aria-expanded={open}>
+        <span>{selectedDate ? formatLongDate(selectedDate) : "Alege data"}</span>
+        <span className="follow-date-icon">Calendar</span>
+      </button>
+      {open && (
+        <div className="follow-date-popover">
+          <div className="follow-date-head">
+            <button type="button" onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1))}>‹</button>
+            <strong>{new Intl.DateTimeFormat("ro-RO", { month: "long", year: "numeric" }).format(viewDate)}</strong>
+            <button type="button" onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1))}>›</button>
+          </div>
+          <div className="follow-date-weekdays">
+            {["Lu", "Ma", "Mi", "Jo", "Vi", "Sa", "Du"].map((day) => <span key={day}>{day}</span>)}
+          </div>
+          <div className="follow-date-days">
+            {dayCells.map((date) => {
+              const key = toDateKey(date);
+              const outside = date.getMonth() !== viewDate.getMonth();
+              const selected = value === key;
+              const today = isSameDay(date, new Date());
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  className={`${outside ? "muted" : ""} ${selected ? "selected" : ""} ${today ? "today" : ""}`}
+                  onClick={() => chooseDate(date)}
+                >
+                  {date.getDate()}
+                </button>
+              );
+            })}
+          </div>
+          <div className="follow-date-actions">
+            <button type="button" onClick={() => chooseDate(new Date())}>Azi</button>
+            <button type="button" onClick={() => { onChange(""); setOpen(false); }}>Sterge</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

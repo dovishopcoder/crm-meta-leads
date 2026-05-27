@@ -875,29 +875,125 @@ label textarea {
 }
 
 .follow-date-field {
+  position: relative;
+  display: grid;
+  gap: 7px;
   min-width: 0;
-  overflow: hidden;
 }
 
-.follow-date-input {
-  display: block;
+.follow-date-trigger {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
   width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
+  min-height: 42px;
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  text-align: left;
+  font-weight: 500;
+}
+
+.follow-date-trigger.open {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px var(--green-soft);
+}
+
+.follow-date-trigger span:first-child {
   overflow: hidden;
-  text-align: left;
-  appearance: none;
-  -webkit-appearance: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.follow-date-input::-webkit-date-and-time-value {
+.follow-date-icon {
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.follow-date-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 8;
+  min-width: 280px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.follow-date-head,
+.follow-date-actions {
+  display: grid;
+  grid-template-columns: 34px 1fr 34px;
+  align-items: center;
+  gap: 8px;
+}
+
+.follow-date-head strong {
+  text-align: center;
+  text-transform: capitalize;
+}
+
+.follow-date-head button,
+.follow-date-actions button {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f9fbfd;
+  color: var(--text);
+  font-weight: 900;
+}
+
+.follow-date-weekdays,
+.follow-date-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.follow-date-weekdays span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.follow-date-days button {
+  aspect-ratio: 1;
   min-width: 0;
-  text-align: left;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 850;
 }
 
-.follow-date-input::-webkit-calendar-picker-indicator {
-  flex-shrink: 0;
+.follow-date-days button.muted {
+  color: #a8b1c1;
+}
+
+.follow-date-days button.today {
+  border-color: var(--green);
+}
+
+.follow-date-days button.selected {
+  background: var(--green);
+  color: #fff;
+}
+
+.follow-date-actions {
+  grid-template-columns: 1fr 1fr;
+  margin-top: 10px;
 }
 
 .need-category-field {
