@@ -226,6 +226,7 @@ export default function HomePage() {
   const [managerFilter, setManagerFilter] = useState("all");
   const [onlyMyLeads, setOnlyMyLeads] = useState(false);
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+  const [showOverdueOnly, setShowOverdueOnly] = useState(false);
   const [search, setSearch] = useState("");
   const [view, setView] = useState("week");
   const [cursorDate, setCursorDate] = useState(startOfDay(new Date()));
@@ -384,6 +385,7 @@ export default function HomePage() {
       .filter((lead) => {
         if (lead.archived) return false;
         if (showUnreadOnly && !lead.unread) return false;
+        if (showOverdueOnly && !isOverdueLead(lead)) return false;
         if (activeFilter !== "all" && lead.platform !== activeFilter) return false;
         if (onlyMyLeads && lead.managerId !== currentManagerCode && lead.managerId !== "unassigned") return false;
         if (managerFilter !== "all" && lead.managerId !== managerFilter) return false;
@@ -393,7 +395,7 @@ export default function HomePage() {
         return haystack.includes(search.toLowerCase());
       })
       .sort((left, right) => leadInboxTime(right) - leadInboxTime(left));
-  }, [activeFilter, currentManager, crmConfig, leads, managerFilter, onlyMyLeads, search, showUnreadOnly]);
+  }, [activeFilter, currentManager, crmConfig, leads, managerFilter, onlyMyLeads, search, showUnreadOnly, showOverdueOnly]);
 
   const visibleDates = useMemo(() => getVisibleDates(cursorDate, view), [cursorDate, view]);
   const selectedLead = leads.find((lead) => lead.id === selectedId);
@@ -406,6 +408,7 @@ export default function HomePage() {
   const activeCurrentInterests = (crmConfig.currentInterests || currentInterests).filter((interest) => interest.active);
   const activeNeedCategories = (crmConfig.needCategories || needCategories).filter((category) => category.active);
   const unreadCount = leads.filter((lead) => lead.unread && !lead.archived).length;
+  const overdueCount = leads.filter(isOverdueLead).length;
   const filtersCount = [activeFilter !== "all", managerFilter !== "all", onlyMyLeads].filter(Boolean).length;
   const filterSummaryParts = [
     activeFilter !== "all" ? platformLabel(activeFilter) : "",
@@ -859,6 +862,12 @@ export default function HomePage() {
             <span>Necitite</span>
             <strong>{unreadCount}</strong>
           </label>
+
+          <label className={showOverdueOnly ? "overdue-filter-toggle active" : "overdue-filter-toggle"}>
+            <input type="checkbox" checked={showOverdueOnly} onChange={(event) => setShowOverdueOnly(event.target.checked)} />
+            <span>Intarziate</span>
+            <strong>{overdueCount}</strong>
+          </label>
         </div>
 
         <section className="lead-list" aria-label="Lista conversatii">
@@ -900,6 +909,11 @@ export default function HomePage() {
         <div className="calendar-meta">
           <span>Prima coloana este mereu data selectata.</span>
           <span>Trage un lead peste o zi sau deschide detaliile pentru salvare.</span>
+          {overdueCount > 0 && (
+            <button type="button" className="overdue-summary" onClick={() => { setShowOverdueOnly(true); setMobileView("inbox"); }}>
+              Restante: {overdueCount}
+            </button>
+          )}
         </div>
 
         <section ref={calendarGridRef} className="calendar-grid" style={{ "--columns": visibleDates.length }} aria-label="Calendar follow-up">
@@ -971,6 +985,7 @@ export default function HomePage() {
 
 function LeadCard({ lead, lookups, onOpen, onDragStart }) {
   const { managerForConfig, stageForConfig, productForConfig } = lookups;
+  const overdue = isOverdueLead(lead);
   return (
     <article className="lead-card" draggable onDragStart={onDragStart} onDoubleClick={onOpen}>
       <Avatar lead={lead} className="avatar" />
@@ -983,7 +998,8 @@ function LeadCard({ lead, lookups, onOpen, onDragStart }) {
         <div className="manager-line">
           <span className="manager-dot" style={{ "--manager-color": managerForConfig(lead.managerId).color }} />
           <span>{managerForConfig(lead.managerId).name}</span>
-          <span className="status-pill">Mesaj nou</span>
+          {lead.unread && <span className="status-pill">Mesaj nou</span>}
+          {overdue && <span className="status-pill overdue-pill">Intarziat</span>}
           {lead.priority === "high" && <span className="status-pill">Prioritar</span>}
         </div>
         <div className="tag-row">
@@ -1005,6 +1021,7 @@ function EventCard({ lead, lookups, onOpen, onDragStart }) {
   const isAssigned = lead.managerId && lead.managerId !== "unassigned";
   const currentInterest = lead.currentInterest ? currentInterestForConfig(lead.currentInterest).name : "Interes neindicat";
   const followTime = formatFollowTime(lead.followTime);
+  const overdue = isOverdueLead(lead);
   return (
     <article className={`event-card ${lead.platform} ${lead.priority === "high" ? "priority-high" : ""}`} draggable onDragStart={onDragStart}>
       <div className="event-card-head">
@@ -1014,10 +1031,11 @@ function EventCard({ lead, lookups, onOpen, onDragStart }) {
           <span>{currentInterest}</span>
         </div>
       </div>
-      {(followTime || lead.unread) && (
+      {(followTime || lead.unread || overdue) && (
         <div className="event-badges">
           {followTime && <span className="event-time">Ora {followTime}</span>}
           {lead.unread && <span className="status-pill unread-pill">Mesaj nou</span>}
+          {overdue && <span className="status-pill overdue-pill">Intarziat</span>}
         </div>
       )}
       {isAssigned && (
@@ -2003,6 +2021,13 @@ function isSameDay(left, right) {
 function isTodayOrFutureDateKey(dateKey) {
   if (!dateKey) return false;
   return parseKey(dateKey).getTime() >= startOfDay(new Date()).getTime();
+}
+
+function isOverdueLead(lead) {
+  if (!lead || lead.archived || !lead.followDate) return false;
+  const date = parseFollowDate(lead.followDate);
+  if (!date) return false;
+  return startOfDay(date).getTime() < startOfDay(new Date()).getTime();
 }
 
 function isTodayOrFutureFollowDate(value) {

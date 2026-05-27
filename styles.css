@@ -238,7 +238,7 @@ label textarea {
 
 .inbox-filter-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: start;
   gap: 8px;
 }
@@ -312,7 +312,8 @@ label textarea {
   background: #f9fbfd;
 }
 
-.unread-filter-toggle {
+.unread-filter-toggle,
+.overdue-filter-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -335,7 +336,14 @@ label textarea {
   color: var(--green);
 }
 
-.unread-filter-toggle input {
+.overdue-filter-toggle.active {
+  border-color: var(--rose);
+  background: var(--rose-soft);
+  color: var(--rose);
+}
+
+.unread-filter-toggle input,
+.overdue-filter-toggle input {
   width: 14px;
   height: 14px;
   min-height: 0;
@@ -343,7 +351,8 @@ label textarea {
   padding: 0;
 }
 
-.unread-filter-toggle strong {
+.unread-filter-toggle strong,
+.overdue-filter-toggle strong {
   display: inline-grid;
   place-items: center;
   min-width: 20px;
@@ -353,6 +362,10 @@ label textarea {
   background: var(--green);
   color: #fff;
   font-size: 11px;
+}
+
+.overdue-filter-toggle strong {
+  background: var(--rose);
 }
 
 .chip,
@@ -568,11 +581,24 @@ label textarea {
 
 .calendar-meta {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 14px;
   margin: 18px 0 12px;
   color: var(--muted);
   font-size: 13px;
+}
+
+.overdue-summary {
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid #f0bbc7;
+  border-radius: 8px;
+  background: var(--rose-soft);
+  color: var(--rose);
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .calendar-grid {
@@ -753,6 +779,11 @@ label textarea {
 .unread-pill {
   background: var(--green-soft);
   color: var(--green);
+}
+
+.overdue-pill {
+  background: var(--rose-soft);
+  color: var(--rose);
 }
 
 .manager-line {
