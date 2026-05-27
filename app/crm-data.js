@@ -224,6 +224,8 @@ export function normalizeLead(lead) {
     customerEmail: lead.customerEmail || "",
     hook: lead.hook || "",
     needCategory: lead.needCategory || "",
+    needCategories: Array.isArray(lead.needCategories) ? lead.needCategories : lead.needCategory ? [lead.needCategory] : [],
+    needCategoryHistory: Array.isArray(lead.needCategoryHistory) ? lead.needCategoryHistory : [],
     activity: Array.isArray(lead.activity) ? lead.activity : []
   };
 }

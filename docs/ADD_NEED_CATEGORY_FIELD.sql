@@ -9,6 +9,23 @@ create table if not exists need_categories (
   created_at timestamptz not null default now()
 );
 
+create table if not exists lead_need_categories (
+  lead_id uuid not null references leads(id) on delete cascade,
+  category_code text not null,
+  manager_id uuid references managers(id) on delete set null,
+  selected_at timestamptz not null default now(),
+  primary key (lead_id, category_code)
+);
+
+create table if not exists lead_need_category_history (
+  id uuid primary key default gen_random_uuid(),
+  lead_id uuid not null references leads(id) on delete cascade,
+  category_code text not null,
+  action text not null default 'added',
+  manager_id uuid references managers(id) on delete set null,
+  changed_at timestamptz not null default now()
+);
+
 insert into need_categories (code, name, position, active) values
   ('familie', 'Familie', 1, true),
   ('sanatate', 'Sanatate', 2, true),
@@ -28,6 +45,8 @@ on conflict (code) do update set
   active = excluded.active;
 
 alter table need_categories enable row level security;
+alter table lead_need_categories enable row level security;
+alter table lead_need_category_history enable row level security;
 
 drop policy if exists "authenticated can read need_categories" on need_categories;
 create policy "authenticated can read need_categories"
@@ -73,3 +92,39 @@ using (exists (
     and managers.role = 'admin'
     and managers.active = true
 ));
+
+drop policy if exists "authenticated can read lead_need_categories" on lead_need_categories;
+create policy "authenticated can read lead_need_categories"
+on lead_need_categories for select
+to authenticated
+using (true);
+
+drop policy if exists "authenticated can insert lead_need_categories" on lead_need_categories;
+create policy "authenticated can insert lead_need_categories"
+on lead_need_categories for insert
+to authenticated
+with check (true);
+
+drop policy if exists "authenticated can delete lead_need_categories" on lead_need_categories;
+create policy "authenticated can delete lead_need_categories"
+on lead_need_categories for delete
+to authenticated
+using (true);
+
+drop policy if exists "authenticated can read lead_need_category_history" on lead_need_category_history;
+create policy "authenticated can read lead_need_category_history"
+on lead_need_category_history for select
+to authenticated
+using (true);
+
+drop policy if exists "authenticated can insert lead_need_category_history" on lead_need_category_history;
+create policy "authenticated can insert lead_need_category_history"
+on lead_need_category_history for insert
+to authenticated
+with check (true);
+
+drop policy if exists "authenticated can delete lead_need_category_history" on lead_need_category_history;
+create policy "authenticated can delete lead_need_category_history"
+on lead_need_category_history for delete
+to authenticated
+using (true);

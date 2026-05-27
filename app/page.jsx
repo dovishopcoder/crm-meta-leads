@@ -463,6 +463,10 @@ export default function HomePage() {
     return activeCurrentInterests.find((interest) => interest.id === id) || currentInterests.find((interest) => interest.id === id) || { id, name: id || "Neindicat" };
   }
 
+  function needCategoryForConfig(id) {
+    return activeNeedCategories.find((category) => category.id === id) || needCategories.find((category) => category.id === id) || { id, name: id || "Neindicat" };
+  }
+
   function goToToday() {
     setCursorDate(startOfDay(new Date()));
     window.requestAnimationFrame(() => {
@@ -622,6 +626,7 @@ export default function HomePage() {
     updateLead(selectedLead.id, (lead) => {
       const previousStage = lead.stage || "new";
       const previousInterest = lead.currentInterest || "";
+      const previousNeedCategories = new Set(lead.needCategories || (lead.needCategory ? [lead.needCategory] : []));
       const newComment = draft.notes.trim();
       const previousProducts = new Set((lead.products || []).map((item) => item.id));
       const selectedProducts = draft.products.map((productId) => {
@@ -649,7 +654,8 @@ export default function HomePage() {
       if (!lead.hook || currentManager?.role === "admin") {
         lead.hook = draft.hook;
       }
-      lead.needCategory = draft.needCategory;
+      lead.needCategories = [...new Set(draft.needCategories || [])];
+      lead.needCategory = lead.needCategories[0] || "";
       lead.currentInterest = draft.currentInterest;
       lead.products = selectedProducts;
       lead.customerEmail = draft.customerEmail.trim();
@@ -673,6 +679,16 @@ export default function HomePage() {
           { interest: lead.currentInterest, changedAt: now, managerId: draft.managerId }
         ];
       }
+      const currentNeedCategories = new Set(lead.needCategories || []);
+      const addedNeedCategories = [...currentNeedCategories].filter((category) => !previousNeedCategories.has(category));
+      const removedNeedCategories = [...previousNeedCategories].filter((category) => !currentNeedCategories.has(category));
+      if (addedNeedCategories.length || removedNeedCategories.length) {
+        lead.needCategoryHistory = [
+          ...(lead.needCategoryHistory || []),
+          ...addedNeedCategories.map((category) => ({ category, action: "added", changedAt: now, managerId: draft.managerId })),
+          ...removedNeedCategories.map((category) => ({ category, action: "removed", changedAt: now, managerId: draft.managerId }))
+        ];
+      }
 
       lead.activity = [
         ...(lead.activity || []),
@@ -685,6 +701,8 @@ export default function HomePage() {
           followTime: lead.followTime,
           products: selectedProducts.filter((item) => !previousProducts.has(item.id)).map((item) => item.id),
           currentInterest: previousInterest !== lead.currentInterest ? lead.currentInterest : "",
+          needCategoriesAdded: addedNeedCategories,
+          needCategoriesRemoved: removedNeedCategories,
           commentAdded: Boolean(newComment)
         }
       ];
@@ -907,7 +925,7 @@ export default function HomePage() {
           warning={warning}
           config={{ managers: activeManagers, stages: activeStages, products: activeProducts, statuses: activeStatuses, religions: activeReligions, hooks: activeHooks, currentInterests: activeCurrentInterests, needCategories: activeNeedCategories }}
           isAdmin={currentManager?.role === "admin"}
-          lookups={{ managerForConfig, stageForConfig, productForConfig, statusForConfig, currentInterestForConfig }}
+          lookups={{ managerForConfig, stageForConfig, productForConfig, statusForConfig, currentInterestForConfig, needCategoryForConfig }}
           currentManager={currentManager}
           onChange={setDraft}
           onClose={closeModal}
@@ -1138,7 +1156,7 @@ function ClientModal({ lead, draft, requiresFollowUp, warning, config, isAdmin, 
 
           <div className="field-grid">
             <label>Prioritate<select value={draft.priority} onChange={(event) => update("priority", event.target.value)}><option value="normal">Normala</option><option value="high">Inalta</option><option value="low">Joasa</option></select></label>
-            <label>Need Category<select value={draft.needCategory} onChange={(event) => update("needCategory", event.target.value)}><option value="">Neindicat</option>{config.needCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
+            <label>Need Category<select multiple size={4} value={draft.needCategories} onChange={(event) => update("needCategories", Array.from(event.target.selectedOptions, (option) => option.value))}>{config.needCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
           </div>
 
           <div className="field-grid">
@@ -1385,6 +1403,14 @@ function buildClientHistory(lead, lookups) {
     });
   });
 
+  (lead.needCategoryHistory || []).forEach((entry) => {
+    items.push({
+      at: entry.changedAt,
+      title: entry.action === "removed" ? "Need category scoasa" : "Need category adaugata",
+      detail: lookups.needCategoryForConfig(entry.category).name
+    });
+  });
+
   (lead.activity || []).forEach((activity) => {
     items.push({
       at: activity.at,
@@ -1415,6 +1441,8 @@ function activityDetail(activity, lookups) {
     const details = [];
     if (activity.stage) details.push(`Etapa: ${lookups.stageForConfig(activity.stage).name}`);
     if (activity.currentInterest) details.push(`Interes: ${lookups.currentInterestForConfig(activity.currentInterest).name}`);
+    if (activity.needCategoriesAdded?.length) details.push(`Need +: ${activity.needCategoriesAdded.map((id) => lookups.needCategoryForConfig(id).name).join(", ")}`);
+    if (activity.needCategoriesRemoved?.length) details.push(`Need -: ${activity.needCategoriesRemoved.map((id) => lookups.needCategoryForConfig(id).name).join(", ")}`);
     if (activity.followDate) details.push(`Follow-up: ${formatFollowDateTime(activity.followDate, activity.followTime)}`);
     if (activity.products?.length) details.push(`Produse noi: ${activity.products.map((id) => lookups.productForConfig(id).name).join(", ")}`);
     return details.join(" · ");
@@ -1534,6 +1562,8 @@ function normalizeLead(lead) {
     stage: lead.stage || "new",
     currentInterest: lead.currentInterest || "",
     needCategory: lead.needCategory || "",
+    needCategories: Array.isArray(lead.needCategories) ? lead.needCategories : lead.needCategory ? [lead.needCategory] : [],
+    needCategoryHistory: Array.isArray(lead.needCategoryHistory) ? lead.needCategoryHistory : [],
     createdAt: lead.createdAt || now,
     firstMessageAt: lead.firstMessageAt || lead.createdAt || now,
     processedCount: lead.processedCount || 0,
@@ -1574,6 +1604,7 @@ function makeEmptyManualLead() {
     phone: "",
     hook: "",
     needCategory: "",
+    needCategories: [],
     currentInterest: "",
     tags: "",
     notes: ""
@@ -1591,6 +1622,7 @@ function makeLeadDraft(lead) {
     tags: (lead.tags || []).join(", "),
     hook: lead.hook || "",
     needCategory: lead.needCategory || "",
+    needCategories: Array.isArray(lead.needCategories) ? lead.needCategories : lead.needCategory ? [lead.needCategory] : [],
     currentInterest: lead.currentInterest || "",
     metaUrl: lead.metaUrlVerified ? lead.metaUrl || "" : "",
     metaUrlVerified: Boolean(lead.metaUrlVerified),
