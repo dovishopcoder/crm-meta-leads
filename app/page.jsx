@@ -821,7 +821,6 @@ export default function HomePage() {
             <button type="button" className="filter-toggle" onClick={() => setFiltersOpen((open) => !open)} aria-expanded={filtersOpen}>
               <span>
                 <strong>Filtre</strong>
-                <small>{filterSummary}</small>
               </span>
               {filtersCount > 0 && <em>{filtersCount}</em>}
               <b>{filtersOpen ? "Ascunde" : "Alege"}</b>

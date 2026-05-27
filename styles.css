@@ -270,12 +270,6 @@ label textarea {
   font-size: 12px;
 }
 
-.filter-toggle strong::after {
-  content: "·";
-  margin-left: 5px;
-  color: var(--muted);
-}
-
 .filter-toggle small {
   overflow: hidden;
   color: var(--muted);
