@@ -1493,7 +1493,7 @@ label textarea {
 
   .panel-head-actions {
     display: grid;
-    grid-template-columns: 74px;
+    grid-template-columns: 54px 104px;
     gap: 6px;
   }
 
