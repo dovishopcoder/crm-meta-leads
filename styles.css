@@ -731,6 +731,7 @@ label textarea {
 
 .client-dialog {
   width: min(620px, calc(100vw - 28px));
+  max-width: calc(100vw - 28px);
   padding: 0;
   border: 0;
   border-radius: 10px;
@@ -763,6 +764,7 @@ label textarea {
   display: grid;
   align-content: start;
   gap: 16px;
+  min-width: 0;
   padding: 24px;
 }
 
@@ -906,12 +908,14 @@ label textarea {
 .messages-section {
   display: grid;
   gap: 12px;
+  min-width: 0;
 }
 
 .messages-list {
   display: flex;
   flex-direction: column;
   gap: 9px;
+  min-width: 0;
   max-height: 300px;
   overflow: auto;
   padding: 2px;
@@ -919,6 +923,8 @@ label textarea {
 
 .message-bubble {
   width: min(82%, 520px);
+  max-width: 100%;
+  min-width: 0;
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -939,7 +945,9 @@ label textarea {
   margin: 0;
   color: var(--text);
   line-height: 1.45;
+  overflow-wrap: anywhere;
   white-space: pre-wrap;
+  word-break: break-word;
   user-select: text;
 }
 
