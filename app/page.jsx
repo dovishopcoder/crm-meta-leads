@@ -220,6 +220,8 @@ export default function HomePage() {
   const calendarPanelRef = useRef(null);
   const initialMobileScrollDone = useRef(false);
   const calendarGridRef = useRef(null);
+  const latestInboxSignatureRef = useRef("");
+  const refreshInFlightRef = useRef(false);
 
   function focusMobileTabs(behavior = "smooth") {
     if (typeof window === "undefined" || window.innerWidth > 900) return;
@@ -237,6 +239,8 @@ export default function HomePage() {
   }
 
   async function refreshCrmData({ keepManager = false, reason = "" } = {}) {
+    if (refreshInFlightRef.current) return;
+    refreshInFlightRef.current = true;
     try {
       if (!keepManager) {
         const session = await getCurrentSession();
@@ -256,10 +260,13 @@ export default function HomePage() {
       }
 
       const remoteLeads = await loadSupabaseLeads();
+      const nextInboxSignature = inboxSignature(remoteLeads);
+      const previousInboxSignature = latestInboxSignatureRef.current;
       setLeads(remoteLeads);
+      latestInboxSignatureRef.current = nextInboxSignature;
       setDataSource("supabase");
       setLoadError("");
-      if (reason === "realtime") {
+      if ((reason === "realtime" || reason === "poll") && previousInboxSignature && previousInboxSignature !== nextInboxSignature) {
         setLiveNotice("Mesaj nou primit");
         window.setTimeout(() => setLiveNotice(""), 2200);
       }
@@ -277,6 +284,9 @@ export default function HomePage() {
       setLeads([]);
       setDataSource("error");
         setLoadError(error.message || "Baza de date nu raspunde.");
+    }
+    finally {
+      refreshInFlightRef.current = false;
     }
   }
 
@@ -318,12 +328,25 @@ export default function HomePage() {
     if (!loaded || !supabase || dataSource !== "supabase") return;
 
     let refreshTimer = null;
+    let pollTimer = null;
     const scheduleRefresh = () => {
       window.clearTimeout(refreshTimer);
       refreshTimer = window.setTimeout(() => {
         refreshCrmData({ keepManager: true, reason: "realtime" });
       }, 350);
     };
+
+    const pollRefresh = () => {
+      if (document.hidden) return;
+      refreshCrmData({ keepManager: true, reason: "poll" });
+    };
+
+    pollTimer = window.setInterval(pollRefresh, 8000);
+
+    const refreshWhenVisible = () => {
+      if (!document.hidden) pollRefresh();
+    };
+    document.addEventListener("visibilitychange", refreshWhenVisible);
 
     const channel = supabase
       .channel("crm-leads-realtime")
@@ -333,6 +356,8 @@ export default function HomePage() {
 
     return () => {
       window.clearTimeout(refreshTimer);
+      window.clearInterval(pollTimer);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
       supabase.removeChannel(channel);
     };
   }, [dataSource, loaded]);
@@ -1511,6 +1536,12 @@ function leadInboxTime(lead) {
   }, 0);
   const directValue = Date.parse(lead.lastMessageAt || lead.firstMessageAt || lead.createdAt || "");
   return Math.max(lastMessage, Number.isNaN(directValue) ? 0 : directValue);
+}
+
+function inboxSignature(leads) {
+  const unreadLeads = leads.filter((lead) => lead.unread && !lead.archived);
+  const latest = unreadLeads.reduce((max, lead) => Math.max(max, leadInboxTime(lead)), 0);
+  return `${unreadLeads.length}:${latest}`;
 }
 
 function makeEmptyManualLead() {
