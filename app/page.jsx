@@ -1165,7 +1165,7 @@ function ClientModal({ lead, draft, requiresFollowUp, warning, config, isAdmin, 
           </div>
 
           <div className="field-grid">
-            <label>Data follow-up<input value={draft.followDate} onChange={(event) => update("followDate", event.target.value)} type="date" /></label>
+            <FollowDateSelector value={draft.followDate} onChange={(value) => update("followDate", value)} />
             <div className="time-select-grid">
               <label>Ora<select value={draft.followHour} onChange={(event) => updateFollowHour(event.target.value)}><option value="">Fara ora</option>{FOLLOW_HOUR_OPTIONS.map((hour) => <option key={hour} value={hour}>{hour}</option>)}</select></label>
               <label>Minute<select value={draft.followMinute} onChange={(event) => updateFollowMinute(event.target.value)} disabled={!draft.followHour}>{FOLLOW_MINUTE_OPTIONS.map((minute) => <option key={minute} value={minute}>{minute}</option>)}</select></label>
@@ -1233,6 +1233,55 @@ function ClientModal({ lead, draft, requiresFollowUp, warning, config, isAdmin, 
           )}
         </div>
       </section>
+    </div>
+  );
+}
+
+function FollowDateSelector({ value, onChange }) {
+  const selectedDate = followDateInputValue(value);
+  const [selectedYear = "", selectedMonth = "", selectedDay = ""] = selectedDate ? selectedDate.split("-") : [];
+  const currentYear = new Date().getFullYear();
+  const years = Array.from(new Set([currentYear, currentYear + 1, currentYear + 2, currentYear + 3, Number(selectedYear)].filter(Boolean))).sort((left, right) => left - right);
+  const monthValue = selectedMonth || "";
+  const yearValue = selectedYear || "";
+  const dayValue = selectedDay || "";
+  const daysInMonth = yearValue && monthValue ? new Date(Number(yearValue), Number(monthValue), 0).getDate() : 31;
+
+  function updatePart(part, nextValue) {
+    const nextYear = part === "year" ? nextValue : yearValue;
+    const nextMonth = part === "month" ? nextValue : monthValue;
+    let nextDay = part === "day" ? nextValue : dayValue;
+
+    if (!nextYear && !nextMonth && !nextDay) {
+      onChange("");
+      return;
+    }
+
+    const completeYear = nextYear || String(currentYear);
+    const completeMonth = nextMonth || "01";
+    const maxDay = new Date(Number(completeYear), Number(completeMonth), 0).getDate();
+    if (Number(nextDay || 1) > maxDay) nextDay = String(maxDay).padStart(2, "0");
+    const completeDay = nextDay || "01";
+    onChange(`${completeYear}-${completeMonth}-${completeDay}`);
+  }
+
+  return (
+    <div className="follow-date-field">
+      <span className="field-label">Data follow-up</span>
+      <div className="follow-date-select-grid">
+        <select value={dayValue} onChange={(event) => updatePart("day", event.target.value)} aria-label="Zi follow-up">
+          <option value="">Zi</option>
+          {Array.from({ length: daysInMonth }, (_, index) => String(index + 1).padStart(2, "0")).map((day) => <option key={day} value={day}>{day}</option>)}
+        </select>
+        <select value={monthValue} onChange={(event) => updatePart("month", event.target.value)} aria-label="Luna follow-up">
+          <option value="">Luna</option>
+          {Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, "0")).map((month) => <option key={month} value={month}>{month}</option>)}
+        </select>
+        <select value={yearValue} onChange={(event) => updatePart("year", event.target.value)} aria-label="An follow-up">
+          <option value="">An</option>
+          {years.map((year) => <option key={year} value={String(year)}>{year}</option>)}
+        </select>
+      </div>
     </div>
   );
 }

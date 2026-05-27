@@ -874,6 +874,31 @@ label textarea {
   font-weight: 750;
 }
 
+.follow-date-field {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.follow-date-select-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 0.9fr) minmax(0, 1.2fr);
+  gap: 8px;
+}
+
+.follow-date-select-grid select {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  padding: 10px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  outline: none;
+  font-weight: 500;
+}
+
 .need-category-field {
   position: relative;
   display: grid;
