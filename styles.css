@@ -248,8 +248,9 @@ label textarea {
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 8px;
-  min-height: 42px;
-  padding: 8px 10px;
+  min-height: 36px;
+  height: 36px;
+  padding: 6px 9px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fff;
@@ -259,18 +260,18 @@ label textarea {
 
 .filter-toggle span {
   display: grid;
-  gap: 2px;
+  gap: 0;
   min-width: 0;
 }
 
 .filter-toggle strong {
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .filter-toggle small {
   overflow: hidden;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 750;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -279,19 +280,19 @@ label textarea {
 .filter-toggle em {
   display: grid;
   place-items: center;
-  min-width: 22px;
-  height: 22px;
+  min-width: 20px;
+  height: 20px;
   border-radius: 999px;
   background: var(--green);
   color: #fff;
-  font-size: 12px;
+  font-size: 11px;
   font-style: normal;
   font-weight: 850;
 }
 
 .filter-toggle b {
   color: var(--green);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .filter-panel {
@@ -307,14 +308,15 @@ label textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  min-height: 42px;
-  padding: 8px 10px;
+  gap: 6px;
+  min-height: 36px;
+  height: 36px;
+  padding: 6px 9px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fff;
   color: var(--text);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 850;
   white-space: nowrap;
 }
@@ -326,8 +328,8 @@ label textarea {
 }
 
 .unread-filter-toggle input {
-  width: 15px;
-  height: 15px;
+  width: 14px;
+  height: 14px;
   min-height: 0;
   margin: 0;
   padding: 0;
@@ -336,13 +338,13 @@ label textarea {
 .unread-filter-toggle strong {
   display: inline-grid;
   place-items: center;
-  min-width: 24px;
-  height: 24px;
-  padding: 0 6px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
   border-radius: 999px;
   background: var(--green);
   color: #fff;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .chip,
