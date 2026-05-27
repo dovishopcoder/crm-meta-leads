@@ -43,7 +43,7 @@ export async function POST(request) {
     }
 
     const manyChatPayload = {
-      subscriber_id: numericOrString(subscriberId),
+      subscriber_id: String(subscriberId),
       data: {
         version: "v2",
         content: {
@@ -205,10 +205,6 @@ function parseJson(text) {
 
 function normalizeManyChatId(value) {
   return String(value || "").trim().replace(/^manychat:/i, "").replace(/^user:/i, "");
-}
-
-function numericOrString(value) {
-  return /^\d+$/.test(value) ? Number(value) : value;
 }
 
 function managerNameToCode(name) {
