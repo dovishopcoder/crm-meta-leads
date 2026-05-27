@@ -152,12 +152,14 @@
 .stats-page-shell,
 .checklist-page-shell {
   min-height: 100vh;
+  min-height: 100dvh;
   padding: 22px;
   background: var(--bg);
 }
 
 .admin-page-shell {
   min-height: 100vh;
+  min-height: 100dvh;
   padding: 22px;
   background: var(--bg);
 }
@@ -452,6 +454,7 @@
   display: grid;
   place-items: center;
   min-height: 100vh;
+  min-height: 100dvh;
   padding: 22px;
   background: var(--bg);
 }

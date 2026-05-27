@@ -24,9 +24,15 @@
   user-select: none;
 }
 
+html,
+body {
+  min-height: 100%;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg);
   color: var(--text);
 }
@@ -72,7 +78,9 @@ input[type="date"] {
   grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
   grid-template-rows: auto 1fr;
   height: 100vh;
+  height: 100dvh;
   min-height: 100vh;
+  min-height: 100dvh;
   overflow: hidden;
 }
 
@@ -95,6 +103,7 @@ input[type="date"] {
   flex-direction: column;
   gap: 16px;
   height: calc(100vh - 67px);
+  height: calc(100dvh - 67px);
   min-height: 0;
   padding: 22px;
   background: #fbfcfe;
@@ -1314,9 +1323,12 @@ label textarea {
 
   .app-shell {
     grid-template-columns: 1fr;
-    height: auto;
-    min-height: auto;
-    overflow: visible;
+    grid-template-rows: auto auto minmax(0, 1fr);
+    height: 100vh;
+    height: 100dvh;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: hidden;
   }
 
   .crm-top-menu {
@@ -1358,10 +1370,10 @@ label textarea {
 
   .inbox-panel {
     height: auto;
-    min-height: auto;
+    min-height: 0;
     border-right: 0;
     border-bottom: 1px solid var(--line);
-    overflow: visible;
+    overflow: hidden;
   }
 
   .lead-list {
@@ -1370,6 +1382,8 @@ label textarea {
   }
 
   .calendar-panel {
+    min-height: 0;
+    overflow: auto;
     padding-top: 18px;
   }
 
