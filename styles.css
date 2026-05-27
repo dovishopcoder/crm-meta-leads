@@ -244,9 +244,9 @@ label textarea {
 }
 
 .filter-toggle {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   min-height: 36px;
   height: 36px;
@@ -259,10 +259,7 @@ label textarea {
 }
 
 .filter-toggle span {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
+  display: block;
 }
 
 .filter-toggle strong {

@@ -822,8 +822,6 @@ export default function HomePage() {
               <span>
                 <strong>Filtre</strong>
               </span>
-              {filtersCount > 0 && <em>{filtersCount}</em>}
-              <b>{filtersOpen ? "Ascunde" : "Alege"}</b>
             </button>
 
             {filtersOpen && (
