@@ -215,6 +215,8 @@ export default function HomePage() {
   const [cursorDate, setCursorDate] = useState(startOfDay(new Date()));
   const [mobileView, setMobileView] = useState("inbox");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const mobileTabsRef = useRef(null);
+  const initialMobileScrollDone = useRef(false);
   const calendarGridRef = useRef(null);
 
   async function refreshCrmData({ keepManager = false, reason = "" } = {}) {
@@ -278,6 +280,17 @@ export default function HomePage() {
       window.localStorage.setItem("crm-next-leads", JSON.stringify(leads));
     }
   }, [leads, loaded]);
+
+  useEffect(() => {
+    if (!loaded || initialMobileScrollDone.current || window.innerWidth > 900) return;
+
+    initialMobileScrollDone.current = true;
+    window.requestAnimationFrame(() => {
+      const tabsTop = mobileTabsRef.current?.getBoundingClientRect().top ?? 0;
+      const targetTop = Math.max(0, window.scrollY + tabsTop);
+      window.scrollTo({ top: targetTop, behavior: "auto" });
+    });
+  }, [loaded]);
 
   useEffect(() => {
     if (!loaded || !supabase || dataSource !== "supabase") return;
@@ -679,7 +692,7 @@ export default function HomePage() {
         <AppNav active="crm" manager={currentManager} systemStatus={dataSource === "error" || saveState === "error" ? "error" : "ok"} />
       </div>
 
-      <div className="mobile-crm-tabs" role="tablist" aria-label="Interfete CRM">
+      <div ref={mobileTabsRef} className="mobile-crm-tabs" role="tablist" aria-label="Interfete CRM">
         <button type="button" className={mobileView === "inbox" ? "active" : ""} onClick={() => setMobileView("inbox")}>
           Necitite
         </button>
