@@ -339,16 +339,18 @@ export default function HomePage() {
 
   const filteredLeads = useMemo(() => {
     const currentManagerCode = currentManager?.code || FALLBACK_MANAGER_ID;
-    return leads.filter((lead) => {
-      if (lead.archived || !lead.unread) return false;
-      if (activeFilter !== "all" && lead.platform !== activeFilter) return false;
-      if (onlyMyLeads && lead.managerId !== currentManagerCode && lead.managerId !== "unassigned") return false;
-      if (managerFilter !== "all" && lead.managerId !== managerFilter) return false;
-      const haystack = [lead.name, lead.platform, lead.status, lead.phone, lead.notes, ...(lead.comments || []).map((comment) => comment.text).join(" "), managerForConfig(lead.managerId).name, ...(lead.tags || [])]
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(search.toLowerCase());
-    });
+    return leads
+      .filter((lead) => {
+        if (lead.archived || !lead.unread) return false;
+        if (activeFilter !== "all" && lead.platform !== activeFilter) return false;
+        if (onlyMyLeads && lead.managerId !== currentManagerCode && lead.managerId !== "unassigned") return false;
+        if (managerFilter !== "all" && lead.managerId !== managerFilter) return false;
+        const haystack = [lead.name, lead.platform, lead.status, lead.phone, lead.notes, ...(lead.comments || []).map((comment) => comment.text).join(" "), managerForConfig(lead.managerId).name, ...(lead.tags || [])]
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(search.toLowerCase());
+      })
+      .sort((left, right) => leadInboxTime(right) - leadInboxTime(left));
   }, [activeFilter, currentManager, crmConfig, leads, managerFilter, onlyMyLeads, search]);
 
   const visibleDates = useMemo(() => getVisibleDates(cursorDate, view), [cursorDate, view]);
@@ -1500,6 +1502,15 @@ function normalizeLead(lead) {
     followDate: followDateInputValue(lead.followDate),
     followTime: lead.followTime || extractFollowTime(lead.followDate)
   };
+}
+
+function leadInboxTime(lead) {
+  const lastMessage = (lead.messages || []).reduce((latest, message) => {
+    const value = Date.parse(message.sentAt || message.createdAt || "");
+    return Number.isNaN(value) ? latest : Math.max(latest, value);
+  }, 0);
+  const directValue = Date.parse(lead.lastMessageAt || lead.firstMessageAt || lead.createdAt || "");
+  return Math.max(lastMessage, Number.isNaN(directValue) ? 0 : directValue);
 }
 
 function makeEmptyManualLead() {
