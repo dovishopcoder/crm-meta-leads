@@ -581,17 +581,6 @@ label textarea {
   font-size: 13px;
 }
 
-.overdue-summary {
-  min-height: 32px;
-  padding: 6px 10px;
-  border: 1px solid #f0bbc7;
-  border-radius: 8px;
-  background: var(--rose-soft);
-  color: var(--rose);
-  font-size: 12px;
-  font-weight: 900;
-}
-
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(var(--columns), minmax(180px, 1fr));

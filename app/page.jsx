@@ -906,11 +906,6 @@ export default function HomePage() {
         <div className="calendar-meta">
           <span>Prima coloana este mereu data selectata.</span>
           <span>Trage un lead peste o zi sau deschide detaliile pentru salvare.</span>
-          {overdueCount > 0 && (
-            <button type="button" className="overdue-summary" onClick={() => { setShowOverdueOnly(true); setMobileView("inbox"); }}>
-              Restante: {overdueCount}
-            </button>
-          )}
         </div>
 
         <section ref={calendarGridRef} className="calendar-grid" style={{ "--columns": visibleDates.length }} aria-label="Calendar follow-up">
