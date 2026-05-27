@@ -1393,6 +1393,11 @@ label textarea {
     padding-top: 18px;
   }
 
+  .inbox-panel.mobile-hidden,
+  .calendar-panel.mobile-hidden {
+    display: none;
+  }
+
   .calendar-toolbar,
   .calendar-meta {
     align-items: flex-start;
