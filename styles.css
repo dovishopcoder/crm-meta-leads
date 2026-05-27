@@ -875,28 +875,29 @@ label textarea {
 }
 
 .follow-date-field {
-  display: grid;
-  gap: 7px;
   min-width: 0;
+  overflow: hidden;
 }
 
-.follow-date-select-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 0.8fr) minmax(0, 0.9fr) minmax(0, 1.2fr);
-  gap: 8px;
-}
-
-.follow-date-select-grid select {
+.follow-date-input {
+  display: block;
   width: 100%;
+  max-width: 100%;
   min-width: 0;
-  min-height: 42px;
-  padding: 10px 9px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
-  color: var(--text);
-  outline: none;
-  font-weight: 500;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-align: left;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.follow-date-input::-webkit-date-and-time-value {
+  min-width: 0;
+  text-align: left;
+}
+
+.follow-date-input::-webkit-calendar-picker-indicator {
+  flex-shrink: 0;
 }
 
 .need-category-field {
