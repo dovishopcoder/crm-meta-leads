@@ -216,23 +216,24 @@ export default function HomePage() {
   const [mobileView, setMobileView] = useState("inbox");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const mobileTabsRef = useRef(null);
+  const inboxPanelRef = useRef(null);
+  const calendarPanelRef = useRef(null);
   const initialMobileScrollDone = useRef(false);
   const calendarGridRef = useRef(null);
 
-  function focusMobileTabs() {
+  function focusMobileTabs(behavior = "smooth") {
     if (typeof window === "undefined" || window.innerWidth > 900) return;
 
     window.requestAnimationFrame(() => {
       const tabsTop = mobileTabsRef.current?.getBoundingClientRect().top ?? 0;
       const targetTop = Math.max(0, window.scrollY + tabsTop);
-      window.scrollTo({ top: targetTop, behavior: "smooth" });
+      window.scrollTo({ top: targetTop, behavior });
     });
   }
 
   function switchMobileView(nextView) {
     setMobileView(nextView);
     setFiltersOpen(false);
-    focusMobileTabs();
   }
 
   async function refreshCrmData({ keepManager = false, reason = "" } = {}) {
@@ -301,8 +302,17 @@ export default function HomePage() {
     if (!loaded || initialMobileScrollDone.current || window.innerWidth > 900) return;
 
     initialMobileScrollDone.current = true;
-    focusMobileTabs();
+    focusMobileTabs("auto");
   }, [loaded]);
+
+  useEffect(() => {
+    if (!loaded || !initialMobileScrollDone.current || window.innerWidth > 900) return;
+    const activePanel = mobileView === "calendar" ? calendarPanelRef.current : inboxPanelRef.current;
+    window.requestAnimationFrame(() => {
+      activePanel?.scrollIntoView({ block: "start", behavior: "auto" });
+      focusMobileTabs("auto");
+    });
+  }, [loaded, mobileView]);
 
   useEffect(() => {
     if (!loaded || !supabase || dataSource !== "supabase") return;
@@ -713,7 +723,7 @@ export default function HomePage() {
         </button>
       </div>
 
-      <aside className={`inbox-panel ${mobileView !== "inbox" ? "mobile-hidden" : ""}`}>
+      <aside ref={inboxPanelRef} className={`inbox-panel ${mobileView !== "inbox" ? "mobile-hidden" : ""}`}>
         <div className="panel-head">
           <div>
             <p className="eyebrow">Meta Inbox</p>
@@ -777,7 +787,7 @@ export default function HomePage() {
         </section>
       </aside>
 
-      <section className={`calendar-panel ${mobileView !== "calendar" ? "mobile-hidden" : ""}`}>
+      <section ref={calendarPanelRef} className={`calendar-panel ${mobileView !== "calendar" ? "mobile-hidden" : ""}`}>
         {connectionMessage(dataSource, currentManager, loadError, saveState, saveError, liveNotice) && (
           <div className={`connection-banner ${dataSource === "error" || saveState === "error" ? "offline" : "online"}`}>
             <span>{connectionLabel(dataSource, currentManager)}</span>
