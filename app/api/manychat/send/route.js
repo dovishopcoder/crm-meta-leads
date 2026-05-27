@@ -173,6 +173,9 @@ async function safeInsertOutgoingMessage(supabase, leadId, managerId, text, stat
 
 function manyChatErrorMessage(status, payload, text) {
   const jsonMessage = payload?.message || payload?.error || payload?.description;
+  if (isMessagingWindowError(jsonMessage)) {
+    return "Puntea de mesaje poate trimite din CRM doar in primele 24h de la ultimul mesaj al clientului. Pentru acest client trimite din ManyChat/Meta sau asteapta ca el sa scrie din nou.";
+  }
   if (jsonMessage) return `Puntea de mesaje nu a putut trimite mesajul: ${jsonMessage}`;
 
   const cleanText = String(text || "").replace(/\s+/g, " ").trim();
@@ -181,6 +184,11 @@ function manyChatErrorMessage(status, payload, text) {
   }
 
   return `Puntea de mesaje nu a acceptat mesajul. Status: ${status}${cleanText ? `: ${cleanText.slice(0, 180)}` : ""}`;
+}
+
+function isMessagingWindowError(message) {
+  const normalized = String(message || "").toLowerCase();
+  return normalized.includes("last interaction") && normalized.includes("24 hour");
 }
 
 function jsonError(message, status) {
