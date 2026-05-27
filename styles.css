@@ -861,6 +861,80 @@ label textarea {
   resize: vertical;
 }
 
+.field-label {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.need-category-field {
+  display: grid;
+  gap: 8px;
+}
+
+.need-category-active,
+.need-category-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.need-category-active {
+  min-height: 42px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid #b8dfd2;
+  border-radius: 8px;
+  background: var(--green-soft);
+}
+
+.need-category-pill,
+.need-category-empty,
+.need-category-option {
+  min-height: 30px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.need-category-pill.active {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.need-category-pill small {
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: var(--green);
+  color: #fff;
+  font-size: 10px;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.need-category-empty {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
+.need-category-option {
+  cursor: pointer;
+}
+
+.need-category-option.selected {
+  border-color: var(--green);
+  background: var(--green);
+  color: #fff;
+}
+
 .locked-field select:disabled {
   background: #f4f7fb;
   color: var(--muted);

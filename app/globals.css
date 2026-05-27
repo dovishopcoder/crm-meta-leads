@@ -624,6 +624,26 @@
   background: #fff;
 }
 
+.history-item.history-first,
+.history-item.history-added {
+  border-color: #b8dfd2;
+  background: var(--green-soft);
+}
+
+.history-item.history-removed {
+  border-color: #f0bbc7;
+  background: var(--rose-soft);
+}
+
+.history-item.history-first strong,
+.history-item.history-added strong {
+  color: var(--green);
+}
+
+.history-item.history-removed strong {
+  color: var(--rose);
+}
+
 .history-item span {
   display: block;
   color: var(--muted);

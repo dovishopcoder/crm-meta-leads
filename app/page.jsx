@@ -1094,6 +1094,16 @@ function ClientModal({ lead, draft, requiresFollowUp, warning, config, isAdmin, 
     onChange({ ...draft, followMinute: value });
   }
 
+  function toggleNeedCategory(categoryId) {
+    const selected = new Set(draft.needCategories || []);
+    if (selected.has(categoryId)) {
+      selected.delete(categoryId);
+    } else {
+      selected.add(categoryId);
+    }
+    update("needCategories", [...selected]);
+  }
+
   async function submitMessage(event) {
     event?.preventDefault();
     const text = messageDraft.trim();
@@ -1156,7 +1166,11 @@ function ClientModal({ lead, draft, requiresFollowUp, warning, config, isAdmin, 
 
           <div className="field-grid">
             <label>Prioritate<select value={draft.priority} onChange={(event) => update("priority", event.target.value)}><option value="normal">Normala</option><option value="high">Inalta</option><option value="low">Joasa</option></select></label>
-            <label>Need Category<select multiple size={4} value={draft.needCategories} onChange={(event) => update("needCategories", Array.from(event.target.selectedOptions, (option) => option.value))}>{config.needCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
+            <NeedCategorySelector
+              categories={config.needCategories}
+              selected={draft.needCategories || []}
+              onToggle={toggleNeedCategory}
+            />
           </div>
 
           <div className="field-grid">
@@ -1215,6 +1229,45 @@ function ClientModal({ lead, draft, requiresFollowUp, warning, config, isAdmin, 
   );
 }
 
+function NeedCategorySelector({ categories, selected, onToggle }) {
+  const selectedSet = new Set(selected || []);
+  const selectedCategories = categories.filter((category) => selectedSet.has(category.id));
+
+  return (
+    <div className="need-category-field">
+      <span className="field-label">Need Category</span>
+      <div className="need-category-active" aria-live="polite">
+        {selectedCategories.length ? (
+          selectedCategories.map((category, index) => (
+            <span key={category.id} className="need-category-pill active">
+              {index === 0 && <small>prima</small>}
+              {category.name}
+            </span>
+          ))
+        ) : (
+          <span className="need-category-empty">Neindicat</span>
+        )}
+      </div>
+      <div className="need-category-options" role="group" aria-label="Need Category">
+        {categories.map((category) => {
+          const isSelected = selectedSet.has(category.id);
+          return (
+            <button
+              key={category.id}
+              type="button"
+              className={isSelected ? "need-category-option selected" : "need-category-option"}
+              onClick={() => onToggle(category.id)}
+              aria-pressed={isSelected}
+            >
+              {category.name}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ClientHistory({ lead, lookups }) {
   const [open, setOpen] = useState(false);
   const items = buildClientHistory(lead, lookups);
@@ -1231,7 +1284,7 @@ function ClientHistory({ lead, lookups }) {
       {open && (
         <div className="history-list">
           {items.map((item, index) => (
-            <article key={`${item.at}-${index}`} className="history-item">
+            <article key={`${item.at}-${index}`} className={item.kind ? `history-item ${item.kind}` : "history-item"}>
               <span>{formatDateTime(item.at)}</span>
               <strong>{item.title}</strong>
               {item.detail && <p>{item.detail}</p>}
@@ -1403,11 +1456,18 @@ function buildClientHistory(lead, lookups) {
     });
   });
 
-  (lead.needCategoryHistory || []).forEach((entry) => {
+  const needHistory = lead.needCategoryHistory || [];
+  const firstNeedEntry = [...needHistory]
+    .filter((entry) => entry.action !== "removed")
+    .sort((left, right) => new Date(left.changedAt).getTime() - new Date(right.changedAt).getTime())[0];
+
+  needHistory.forEach((entry) => {
+    const isFirst = firstNeedEntry && firstNeedEntry.changedAt === entry.changedAt && firstNeedEntry.category === entry.category;
     items.push({
       at: entry.changedAt,
-      title: entry.action === "removed" ? "Need category scoasa" : "Need category adaugata",
-      detail: lookups.needCategoryForConfig(entry.category).name
+      title: entry.action === "removed" ? "Need category scoasa" : isFirst ? "Prima need category selectata" : "Need category adaugata",
+      detail: lookups.needCategoryForConfig(entry.category).name,
+      kind: entry.action === "removed" ? "history-removed" : isFirst ? "history-first" : "history-added"
     });
   });
 
