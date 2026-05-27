@@ -1,7 +1,7 @@
 "use client";
 
 import { createClient } from "@supabase/supabase-js";
-import { currentInterests, hooks, makeDefaultLeads } from "./crm-data.js";
+import { currentInterests, hooks, makeDefaultLeads, needCategories } from "./crm-data.js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -159,6 +159,13 @@ export async function loadCrmConfig() {
       name: interest.name,
       position: interest.position,
       active: interest.active
+    })),
+    needCategories: (data.needCategories?.length ? data.needCategories : needCategories).map((category) => ({
+      id: category.code || category.id,
+      uuid: category.id,
+      name: category.name,
+      position: category.position,
+      active: category.active
     }))
   };
 }
@@ -250,6 +257,10 @@ export async function createCurrentInterest({ code, name }) {
   return saveAdminSetting("POST", { type: "currentInterest", code, name, active: true });
 }
 
+export async function createNeedCategory({ code, name }) {
+  return saveAdminSetting("POST", { type: "needCategory", code, name, active: true });
+}
+
 export async function updateManager(id, { name, email, role, color, active }) {
   if (!supabase) throw new Error("Supabase nu este configurat.");
   const { error } = await supabase.from("managers").update({ name, email, role, color, active }).eq("id", id);
@@ -301,6 +312,10 @@ export async function updateHook(id, { code, name, position, active }) {
 
 export async function updateCurrentInterest(id, { code, name, position, active }) {
   return saveAdminSetting("PATCH", { id, type: "currentInterest", code, name, position, active });
+}
+
+export async function updateNeedCategory(id, { code, name, position, active }) {
+  return saveAdminSetting("PATCH", { id, type: "needCategory", code, name, position, active });
 }
 
 export async function deleteAdminSetting(type, id) {
@@ -419,6 +434,7 @@ export async function saveSupabaseLead(lead, options = {}) {
     customer_email: lead.customerEmail || null,
     hook: lead.hook || null,
     current_interest: lead.currentInterest || null,
+    need_category: lead.needCategory || null,
     phone: lead.phone || null,
     notes: lead.notes || null,
     status: lead.status,
@@ -483,7 +499,7 @@ async function findExistingLeadByMetaUrl(metaUrl) {
 }
 
 async function saveLeadRowWithColumnFallback(action, leadRow) {
-  const optionalColumns = ["hook", "current_interest", "follow_up_time", "manychat_id"];
+  const optionalColumns = ["hook", "current_interest", "need_category", "follow_up_time", "manychat_id"];
   let result = await action();
   let changed = true;
   while (result.error && changed) {
@@ -588,6 +604,7 @@ function fromSupabaseLead(row, refs) {
     customerEmail: row.customer_email || "",
     hook: row.hook || "",
     currentInterest: row.current_interest || "",
+    needCategory: row.need_category || "",
     status: row.status,
     unread: row.unread,
     archived: Boolean(row.archived_at),

@@ -62,6 +62,21 @@ const currentInterests = [
   { id: "bibletoday", name: "BibleToday" }
 ];
 
+const needCategories = [
+  { id: "familie", name: "Familie" },
+  { id: "sanatate", name: "Sanatate" },
+  { id: "copii", name: "Copii" },
+  { id: "casatorie", name: "Casatorie" },
+  { id: "dependente", name: "Dependente" },
+  { id: "anxietate", name: "Anxietate" },
+  { id: "depresie", name: "Depresie" },
+  { id: "singuratate", name: "Singuratate" },
+  { id: "financiar", name: "Financiar" },
+  { id: "spiritual", name: "Spiritual" },
+  { id: "pierdere", name: "Pierdere" },
+  { id: "boala", name: "Boala" }
+];
+
 function makeDefaultLeads() {
   return [
     {
@@ -194,7 +209,7 @@ export default function HomePage() {
   const [leads, setLeads] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [currentManager, setCurrentManager] = useState(null);
-  const [crmConfig, setCrmConfig] = useState({ managers, stages, products, statuses: leadStatuses, religions, hooks, currentInterests });
+  const [crmConfig, setCrmConfig] = useState({ managers, stages, products, statuses: leadStatuses, religions, hooks, currentInterests, needCategories });
   const [dataSource, setDataSource] = useState("loading");
   const [loadError, setLoadError] = useState("");
   const [saveState, setSaveState] = useState("idle");
@@ -276,7 +291,7 @@ export default function HomePage() {
         const stored = window.localStorage.getItem("crm-next-leads") || window.localStorage.getItem("crm-leads");
         const initial = stored ? JSON.parse(stored).map(normalizeLead) : makeDefaultLeads();
         setLeads(initial);
-        setCrmConfig({ managers, stages, products, statuses: leadStatuses, religions, hooks, currentInterests });
+        setCrmConfig({ managers, stages, products, statuses: leadStatuses, religions, hooks, currentInterests, needCategories });
         setDataSource("local");
         setLoadError("");
         return;
@@ -387,6 +402,7 @@ export default function HomePage() {
   const activeReligions = (crmConfig.religions || religions).filter((religion) => religion.active);
   const activeHooks = (crmConfig.hooks || hooks).filter((hook) => hook.active);
   const activeCurrentInterests = (crmConfig.currentInterests || currentInterests).filter((interest) => interest.active);
+  const activeNeedCategories = (crmConfig.needCategories || needCategories).filter((category) => category.active);
   const filtersCount = [activeFilter !== "all", managerFilter !== "all", onlyMyLeads].filter(Boolean).length;
   const filterSummary = [
     activeFilter !== "all" ? platformLabel(activeFilter) : "",
@@ -523,6 +539,7 @@ export default function HomePage() {
       email: "",
       customerEmail: "",
       hook: manualLead.hook,
+      needCategory: "",
       status: "new",
       unread: true,
       archived: false,
@@ -632,6 +649,7 @@ export default function HomePage() {
       if (!lead.hook || currentManager?.role === "admin") {
         lead.hook = draft.hook;
       }
+      lead.needCategory = draft.needCategory;
       lead.currentInterest = draft.currentInterest;
       lead.products = selectedProducts;
       lead.customerEmail = draft.customerEmail.trim();
@@ -887,7 +905,7 @@ export default function HomePage() {
           draft={draft}
           requiresFollowUp={modalSource === "inbox" && selectedLead.unread}
           warning={warning}
-          config={{ managers: activeManagers, stages: activeStages, products: activeProducts, statuses: activeStatuses, religions: activeReligions, hooks: activeHooks, currentInterests: activeCurrentInterests }}
+          config={{ managers: activeManagers, stages: activeStages, products: activeProducts, statuses: activeStatuses, religions: activeReligions, hooks: activeHooks, currentInterests: activeCurrentInterests, needCategories: activeNeedCategories }}
           isAdmin={currentManager?.role === "admin"}
           lookups={{ managerForConfig, stageForConfig, productForConfig, statusForConfig, currentInterestForConfig }}
           currentManager={currentManager}
@@ -1120,6 +1138,7 @@ function ClientModal({ lead, draft, requiresFollowUp, warning, config, isAdmin, 
 
           <div className="field-grid">
             <label>Prioritate<select value={draft.priority} onChange={(event) => update("priority", event.target.value)}><option value="normal">Normala</option><option value="high">Inalta</option><option value="low">Joasa</option></select></label>
+            <label>Need Category<select value={draft.needCategory} onChange={(event) => update("needCategory", event.target.value)}><option value="">Neindicat</option>{config.needCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
           </div>
 
           <div className="field-grid">
@@ -1514,6 +1533,7 @@ function normalizeLead(lead) {
     customerEmail: lead.customerEmail || "",
     stage: lead.stage || "new",
     currentInterest: lead.currentInterest || "",
+    needCategory: lead.needCategory || "",
     createdAt: lead.createdAt || now,
     firstMessageAt: lead.firstMessageAt || lead.createdAt || now,
     processedCount: lead.processedCount || 0,
@@ -1553,6 +1573,7 @@ function makeEmptyManualLead() {
     priority: "normal",
     phone: "",
     hook: "",
+    needCategory: "",
     currentInterest: "",
     tags: "",
     notes: ""
@@ -1569,6 +1590,7 @@ function makeLeadDraft(lead) {
     stage: lead.stage || "new",
     tags: (lead.tags || []).join(", "),
     hook: lead.hook || "",
+    needCategory: lead.needCategory || "",
     currentInterest: lead.currentInterest || "",
     metaUrl: lead.metaUrlVerified ? lead.metaUrl || "" : "",
     metaUrlVerified: Boolean(lead.metaUrlVerified),

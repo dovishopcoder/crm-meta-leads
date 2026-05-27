@@ -52,6 +52,21 @@ export const currentInterests = [
   { id: "bibletoday", name: "BibleToday" }
 ];
 
+export const needCategories = [
+  { id: "familie", name: "Familie" },
+  { id: "sanatate", name: "Sanatate" },
+  { id: "copii", name: "Copii" },
+  { id: "casatorie", name: "Casatorie" },
+  { id: "dependente", name: "Dependente" },
+  { id: "anxietate", name: "Anxietate" },
+  { id: "depresie", name: "Depresie" },
+  { id: "singuratate", name: "Singuratate" },
+  { id: "financiar", name: "Financiar" },
+  { id: "spiritual", name: "Spiritual" },
+  { id: "pierdere", name: "Pierdere" },
+  { id: "boala", name: "Boala" }
+];
+
 export function makeDefaultLeads() {
   return [
     {
@@ -208,11 +223,12 @@ export function normalizeLead(lead) {
     email: lead.email || "",
     customerEmail: lead.customerEmail || "",
     hook: lead.hook || "",
+    needCategory: lead.needCategory || "",
     activity: Array.isArray(lead.activity) ? lead.activity : []
   };
 }
 
-export function buildStats(leads, config = { managers, stages, products, currentInterests }) {
+export function buildStats(leads, config = { managers, stages, products, currentInterests, needCategories }) {
   const total = leads.length;
   const unread = leads.filter((lead) => lead.unread && !lead.archived).length;
   const archived = leads.filter((lead) => lead.archived).length;

@@ -11,7 +11,8 @@ const TABLES = {
   status: "lead_statuses",
   religion: "religions",
   hook: "hook_options",
-  currentInterest: "current_interests"
+  currentInterest: "current_interests",
+  needCategory: "need_categories"
 };
 
 const DEFAULT_STATUSES = [
@@ -40,6 +41,21 @@ const DEFAULT_CURRENT_INTERESTS = [
   { code: "bibletoday", name: "BibleToday", position: 2, active: true }
 ];
 
+const DEFAULT_NEED_CATEGORIES = [
+  { code: "familie", name: "Familie", position: 1, active: true },
+  { code: "sanatate", name: "Sanatate", position: 2, active: true },
+  { code: "copii", name: "Copii", position: 3, active: true },
+  { code: "casatorie", name: "Casatorie", position: 4, active: true },
+  { code: "dependente", name: "Dependente", position: 5, active: true },
+  { code: "anxietate", name: "Anxietate", position: 6, active: true },
+  { code: "depresie", name: "Depresie", position: 7, active: true },
+  { code: "singuratate", name: "Singuratate", position: 8, active: true },
+  { code: "financiar", name: "Financiar", position: 9, active: true },
+  { code: "spiritual", name: "Spiritual", position: 10, active: true },
+  { code: "pierdere", name: "Pierdere", position: 11, active: true },
+  { code: "boala", name: "Boala", position: 12, active: true }
+];
+
 function serverSupabase() {
   if (!supabaseUrl || !serviceRoleKey) throw new Error("Supabase server env is missing.");
   return createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
@@ -55,7 +71,7 @@ export async function GET(request) {
     const supabase = serverSupabase();
     await requireManager(request, supabase);
 
-    const [managerResult, stageResult, productResult, statusResult, religionResult, hookResult, currentInterestResult, audienceResult] = await Promise.all([
+    const [managerResult, stageResult, productResult, statusResult, religionResult, hookResult, currentInterestResult, needCategoryResult, audienceResult] = await Promise.all([
       supabase.from("managers").select("id, name, email, role, color, active, created_at").order("created_at", { ascending: true }),
       supabase.from("stages").select("id, code, name, position, active, created_at").order("position", { ascending: true }),
       loadProductRows(supabase),
@@ -63,13 +79,14 @@ export async function GET(request) {
       loadOptionRows(supabase, "religions", DEFAULT_RELIGIONS),
       loadOptionRows(supabase, "hook_options", DEFAULT_HOOKS),
       loadOptionRows(supabase, "current_interests", DEFAULT_CURRENT_INTERESTS),
+      loadOptionRows(supabase, "need_categories", DEFAULT_NEED_CATEGORIES),
       supabase
         .from("leads")
         .select("id, name, platform, customer_email, meta_email, meta_contact_id, phone, first_message_at, archived_at, managers(name), stages(code, name), lead_tags(tag), lead_products(products(code, name))")
         .order("created_at", { ascending: false })
     ]);
 
-    for (const result of [managerResult, stageResult, productResult, statusResult, religionResult, hookResult, currentInterestResult, audienceResult]) {
+    for (const result of [managerResult, stageResult, productResult, statusResult, religionResult, hookResult, currentInterestResult, needCategoryResult, audienceResult]) {
       if (result.error) throw result.error;
     }
 
@@ -81,6 +98,7 @@ export async function GET(request) {
       religions: religionResult.data || [],
       hooks: hookResult.data || [],
       currentInterests: currentInterestResult.data || [],
+      needCategories: needCategoryResult.data || [],
       audienceLeads: (audienceResult.data || []).map(toAudienceLead)
     });
   } catch (error) {

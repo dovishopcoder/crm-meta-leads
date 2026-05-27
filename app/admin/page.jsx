@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { AppNav } from "../components";
-import { countActiveLeadsForManager, createCurrentInterest, createHook, createLeadStatus, createManager, createProduct, createReligion, createStage, deleteAdminSetting, deleteManager, getCurrentSession, loadAdminData, loadCurrentManager, reorderAdminSettings, resetManagerPassword, transferActiveLeads, updateCurrentInterest, updateHook, updateLeadStatus, updateManager, updateProduct, updateReligion, updateStage } from "../supabase-crm";
+import { countActiveLeadsForManager, createCurrentInterest, createHook, createLeadStatus, createManager, createNeedCategory, createProduct, createReligion, createStage, deleteAdminSetting, deleteManager, getCurrentSession, loadAdminData, loadCurrentManager, reorderAdminSettings, resetManagerPassword, transferActiveLeads, updateCurrentInterest, updateHook, updateLeadStatus, updateManager, updateNeedCategory, updateProduct, updateReligion, updateStage } from "../supabase-crm";
 
 export default function AdminPage() {
   const [currentManager, setCurrentManager] = useState(null);
-  const [adminData, setAdminData] = useState({ managers: [], stages: [], products: [], statuses: [], religions: [], hooks: [], currentInterests: [] });
+  const [adminData, setAdminData] = useState({ managers: [], stages: [], products: [], statuses: [], religions: [], hooks: [], currentInterests: [], needCategories: [] });
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -17,6 +17,7 @@ export default function AdminPage() {
   const [religionForm, setReligionForm] = useState({ code: "", name: "", position: "" });
   const [hookForm, setHookForm] = useState({ code: "", name: "", position: "" });
   const [currentInterestForm, setCurrentInterestForm] = useState({ code: "", name: "", position: "" });
+  const [needCategoryForm, setNeedCategoryForm] = useState({ code: "", name: "", position: "" });
   const [editing, setEditing] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [passwordDrafts, setPasswordDrafts] = useState({});
@@ -115,6 +116,15 @@ export default function AdminPage() {
     setCurrentInterestForm({ code: "", name: "", position: "" });
   }
 
+  async function handleCreateNeedCategory(event) {
+    event.preventDefault();
+    await submitAdminAction(async () => {
+      const category = await createNeedCategory(needCategoryForm);
+      addSettingRow("needCategories", category);
+    }, "Need category adaugata.", { refresh: false });
+    setNeedCategoryForm({ code: "", name: "", position: "" });
+  }
+
   function addSettingRow(key, row) {
     if (!row?.id) return;
     setAdminData((current) => ({
@@ -168,7 +178,8 @@ export default function AdminPage() {
       status: () => updateLeadStatus(editing.id, editForm),
       religion: () => updateReligion(editing.id, editForm),
       hook: () => updateHook(editing.id, editForm),
-      currentInterest: () => updateCurrentInterest(editing.id, editForm)
+      currentInterest: () => updateCurrentInterest(editing.id, editForm),
+      needCategory: () => updateNeedCategory(editing.id, editForm)
     };
 
     await submitAdminAction(actions[editing.type], "Modificarile au fost salvate.");
@@ -216,7 +227,8 @@ export default function AdminPage() {
       status: "statusul",
       religion: "religia",
       hook: "hook-ul",
-      currentInterest: "interesul actual"
+      currentInterest: "interesul actual",
+      needCategory: "need category"
     };
     const confirmed = window.confirm(`Stergi ${labels[type] || "setarea"} "${row.name}"?`);
     if (!confirmed) return;
@@ -399,6 +411,31 @@ export default function AdminPage() {
         </section>
 
         <section className="admin-card">
+          <h3>Adauga need category</h3>
+          <form className="admin-form" onSubmit={handleCreateNeedCategory}>
+            <input value={needCategoryForm.code} onChange={(event) => setNeedCategoryForm({ ...needCategoryForm, code: slugifyInput(event.target.value) })} placeholder="cod-categorie" required />
+            <input value={needCategoryForm.name} onChange={(event) => setNeedCategoryForm({ ...needCategoryForm, name: event.target.value })} placeholder="Nume categorie" required />
+            <button className="primary-btn" type="submit">Adauga</button>
+          </form>
+          <AdminTable
+            title="Need Category"
+            columns={["Cod", "Nume", "Activ"]}
+            rows={adminData.needCategories}
+            type="needCategory"
+            editing={editing}
+            editForm={editForm}
+            onEdit={startEdit}
+            onEditForm={setEditForm}
+            onSave={saveEdit}
+            onCancel={cancelEdit}
+            onDelete={handleDeleteSetting}
+            draggedSetting={draggedSetting}
+            onDragStart={setDraggedSetting}
+            onDropRow={handleReorderSetting}
+          />
+        </section>
+
+        <section className="admin-card">
           <h3>Adauga religie</h3>
           <form className="admin-form" onSubmit={handleCreateReligion}>
             <input value={religionForm.code} onChange={(event) => setReligionForm({ ...religionForm, code: slugifyInput(event.target.value) })} placeholder="cod-religie" required />
@@ -498,7 +535,8 @@ function settingKeyForType(type) {
     status: "statuses",
     religion: "religions",
     hook: "hooks",
-    currentInterest: "currentInterests"
+    currentInterest: "currentInterests",
+    needCategory: "needCategories"
   }[type];
 }
 
@@ -667,7 +705,7 @@ function ReadOnlyCells({ type, row }) {
     );
   }
 
-  if (type === "stage" || type === "status" || type === "religion" || type === "hook" || type === "currentInterest") {
+  if (type === "stage" || type === "status" || type === "religion" || type === "hook" || type === "currentInterest" || type === "needCategory") {
     return (
       <>
         <td>{row.code}</td>
@@ -702,7 +740,7 @@ function EditableCells({ type, form, onChange }) {
     );
   }
 
-  if (type === "stage" || type === "status" || type === "religion" || type === "hook" || type === "currentInterest") {
+  if (type === "stage" || type === "status" || type === "religion" || type === "hook" || type === "currentInterest" || type === "needCategory") {
     return (
       <>
         <td><input className="table-input" value={form.code || ""} onChange={(event) => update("code", slugifyInput(event.target.value))} /></td>
