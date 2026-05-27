@@ -1200,7 +1200,6 @@ function MessagesPanel({ lead, draft, state, error, lookups, onChange, onSubmit 
       <div className="comments-head">
         <div>
           <p className="eyebrow">Mesaje</p>
-          <h3>Conversatie ManyChat</h3>
         </div>
         <span className="comment-author">{messages.length} mesaje</span>
       </div>

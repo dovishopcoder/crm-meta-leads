@@ -173,14 +173,14 @@ async function safeInsertOutgoingMessage(supabase, leadId, managerId, text, stat
 
 function manyChatErrorMessage(status, payload, text) {
   const jsonMessage = payload?.message || payload?.error || payload?.description;
-  if (jsonMessage) return `ManyChat a refuzat mesajul: ${jsonMessage}`;
+  if (jsonMessage) return `Puntea de mesaje nu a putut trimite mesajul: ${jsonMessage}`;
 
   const cleanText = String(text || "").replace(/\s+/g, " ").trim();
   if (cleanText.startsWith("<!DOCTYPE") || cleanText.startsWith("<html")) {
-    return `ManyChat a raspuns cu pagina HTML in loc de JSON. Status ManyChat: ${status}. Verifica daca API-ul Public este activ pe planul ManyChat si daca endpointul de trimitere este permis.`;
+    return `Puntea de mesaje nu a raspuns corect. Status: ${status}. Verifica daca API-ul este activ si daca trimiterea mesajelor este permisa.`;
   }
 
-  return `ManyChat nu a acceptat mesajul. Status ManyChat: ${status}${cleanText ? `: ${cleanText.slice(0, 180)}` : ""}`;
+  return `Puntea de mesaje nu a acceptat mesajul. Status: ${status}${cleanText ? `: ${cleanText.slice(0, 180)}` : ""}`;
 }
 
 function jsonError(message, status) {
