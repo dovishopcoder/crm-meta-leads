@@ -91,9 +91,13 @@ export function StatsPanel({ stats, showManagerStats = true }) {
         {stats.cards.map((card) => <article key={card.label} className="stat-card"><span>{card.label}</span><strong>{card.value}</strong></article>)}
       </div>
       <div className="stats-layout">
-        {showManagerStats && <StatsTable title="Activitate manageri" columns={["Manager", "Prelucrari", "Mesaje", "Comentarii", "Etape", "Interese", "Produse", "Arh./React."]} rows={stats.managerActivity || []} />}
+        {showManagerStats && <StatsTable title="Activitate manageri" columns={["Manager", "Prelucrari", "Mesaje", "Comentarii", "Etape", "Interese", "Need", "Produse", "Arh./React."]} rows={stats.managerActivity || []} />}
         {showManagerStats && <StatsTable title="Lead-uri atribuite" columns={["Manager", "Active", "Total", "Necitite", "Arhivate"]} rows={stats.managers} />}
-        <StatsTable title="Etape / Tags" columns={["Etapa", "Lead-uri", "Prelucrari"]} rows={stats.stages} />
+        <StatsTable title="Palnie BibleToday" columns={["Pas", "Lead-uri", "Rata din invitati"]} rows={stats.bibleTodayFunnel || []} />
+        <StatsTable title="Palnie biserica" columns={["Pas", "Lead-uri", "Rata din invitati"]} rows={stats.churchFunnel || []} />
+        <StatsTable title="Palnie studiu biblic" columns={["Pas", "Lead-uri", "Rata din propuneri"]} rows={stats.studyFunnel || []} />
+        <StatsTable title="Need Category" columns={["Need", "Active", "Total", "Schimbari"]} rows={stats.needCategories || []} />
+        <StatsTable title="Etape / Tags" columns={["Etapa", "Active", "Total", "Rata din total"]} rows={stats.stages} />
         <StatsTable title="Interes actual" columns={["Interes", "Lead-uri active", "Schimbari in istoric"]} rows={stats.currentInterests || []} />
         <StatsTable title="Produse propuse" columns={["Produs", "Propuneri", "Acceptate"]} rows={stats.products} />
       </div>

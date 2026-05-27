@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AppNav, StatsPanel } from "../components";
-import { buildStats, currentInterests, loadStoredLeads, managers, products, stages } from "../crm-data";
+import { buildStats, currentInterests, loadStoredLeads, managers, needCategories, products, stages } from "../crm-data";
 import { getCurrentSession, loadCrmConfig, loadCurrentManager, loadSupabaseLeads, signOut, supabase } from "../supabase-crm";
 
 export default function StatsPage() {
@@ -11,7 +11,7 @@ export default function StatsPage() {
   const [dataSource, setDataSource] = useState("loading");
   const [loadError, setLoadError] = useState("");
   const [currentManager, setCurrentManager] = useState(null);
-  const [crmConfig, setCrmConfig] = useState({ managers, stages, products, currentInterests });
+  const [crmConfig, setCrmConfig] = useState({ managers, stages, products, currentInterests, needCategories });
 
   useEffect(() => {
     async function loadLeads() {
@@ -36,7 +36,7 @@ export default function StatsPage() {
       } catch (error) {
         if (!supabase) {
           setLeads(loadStoredLeads());
-          setCrmConfig({ managers, stages, products, currentInterests });
+          setCrmConfig({ managers, stages, products, currentInterests, needCategories });
           setDataSource("local");
           setLoadError("");
           return;

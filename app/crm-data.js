@@ -232,17 +232,24 @@ export function normalizeLead(lead) {
 
 export function buildStats(leads, config = { managers, stages, products, currentInterests, needCategories }) {
   const total = leads.length;
+  const active = leads.filter((lead) => !lead.archived);
   const unread = leads.filter((lead) => lead.unread && !lead.archived).length;
   const archived = leads.filter((lead) => lead.archived).length;
   const processed = leads.reduce((sum, lead) => sum + (lead.processedCount || 0), 0);
   const averageFollowup = averageFollowupDays(leads);
+  const bibleTodayInvited = countStageFamily(leads, BIBLE_TODAY_FUNNEL.map((step) => step.id));
+  const bibleTodayAccepted = countStageFamily(leads, ["acceptat-invitatie-bibletoday", "confirmat-bibletoday", "participat-bibletoday"]);
+  const churchInvited = countStageFamily(leads, CHURCH_FUNNEL.map((step) => step.id));
+  const churchParticipated = countStageFamily(leads, ["participat-la-biserica"]);
 
   return {
     cards: [
       { label: "Lead-uri total", value: total },
       { label: "Mesaje necitite", value: unread },
+      { label: "Rata acceptare BibleToday", value: percent(bibleTodayAccepted, bibleTodayInvited) },
+      { label: "Participare biserica", value: percent(churchParticipated, churchInvited) },
       { label: "Prelucrari total", value: processed },
-      { label: "Arhivate", value: archived },
+      { label: "Active / Arhivate", value: `${active.length} / ${archived}` },
       { label: "Timp mediu follow-up", value: `${averageFollowup} zile` }
     ],
     managers: config.managers.map((manager) => {
@@ -259,13 +266,15 @@ export function buildStats(leads, config = { managers, stages, products, current
         countManagerComments(leads, managerCode),
         countManagerStageChanges(leads, managerCode),
         countManagerInterestChanges(leads, managerCode),
+        countManagerNeedChanges(leads, managerCode),
         countManagerProducts(leads, managerCode),
         countManagerArchiveActions(leads, managerCode)
       ];
     }),
-    stages: config.stages.map((stage) => {
+    stages: (config.stages || stages).map((stage) => {
       const stageLeads = leads.filter((lead) => lead.stage === stage.id);
-      return [stage.name, stageLeads.length, stageLeads.reduce((sum, lead) => sum + (lead.processedCount || 0), 0)];
+      const activeStageLeads = stageLeads.filter((lead) => !lead.archived);
+      return [stage.name, activeStageLeads.length, stageLeads.length, percent(stageLeads.length, total)];
     }),
     products: config.products.map((product) => {
       const proposed = leads.flatMap((lead) => lead.products || []).filter((item) => item.id === product.id);
@@ -275,8 +284,60 @@ export function buildStats(leads, config = { managers, stages, products, current
       const activeLeads = leads.filter((lead) => !lead.archived && lead.currentInterest === interest.id);
       const historyCount = leads.flatMap((lead) => lead.currentInterestHistory || []).filter((entry) => entry.interest === interest.id).length;
       return [interest.name, activeLeads.length, historyCount];
-    })
+    }),
+    needCategories: (config.needCategories || needCategories).map((category) => {
+      const activeLeads = active.filter((lead) => leadNeedCategories(lead).includes(category.id));
+      const allLeads = leads.filter((lead) => leadNeedCategories(lead).includes(category.id));
+      const historyCount = leads.flatMap((lead) => lead.needCategoryHistory || []).filter((entry) => entry.category === category.id).length;
+      return [category.name, activeLeads.length, allLeads.length, historyCount];
+    }),
+    bibleTodayFunnel: buildFunnelRows(leads, BIBLE_TODAY_FUNNEL),
+    churchFunnel: buildFunnelRows(leads, CHURCH_FUNNEL),
+    studyFunnel: buildFunnelRows(leads, STUDY_FUNNEL)
   };
+}
+
+const BIBLE_TODAY_FUNNEL = [
+  { id: "invitatie-bibletoday", name: "Invitati BibleToday" },
+  { id: "acceptat-invitatie-bibletoday", name: "Au acceptat invitatia" },
+  { id: "confirmat-bibletoday", name: "Au confirmat" },
+  { id: "participat-bibletoday", name: "Au participat" }
+];
+
+const CHURCH_FUNNEL = [
+  { id: "invitat-la-biserica", name: "Invitati la biserica" },
+  { id: "acceptat-invitatie-biserica", name: "Au acceptat invitatia" },
+  { id: "confirmat-participare-biserica", name: "Au confirmat participarea" },
+  { id: "participat-la-biserica", name: "Au participat" }
+];
+
+const STUDY_FUNNEL = [
+  { id: "propus-studiu-biblic", name: "Propus studiu biblic" },
+  { id: "acceptat-curs-biblic", name: "Acceptat curs biblic" },
+  { id: "studiu-biblic-activ", name: "Studiu biblic activ" },
+  { id: "studiu-biblic-finisat", name: "Studiu biblic finisat" }
+];
+
+function buildFunnelRows(leads, steps) {
+  const firstCount = countStageFamily(leads, steps.map((step) => step.id));
+  return steps.map((step, index) => {
+    const count = countStageFamily(leads, steps.slice(index).map((item) => item.id));
+    return [step.name, count, percent(count, firstCount)];
+  });
+}
+
+function countStageFamily(leads, stageIds) {
+  const ids = new Set(stageIds);
+  return leads.filter((lead) => !lead.archived && ids.has(lead.stage)).length;
+}
+
+function leadNeedCategories(lead) {
+  return Array.isArray(lead.needCategories) && lead.needCategories.length ? lead.needCategories : lead.needCategory ? [lead.needCategory] : [];
+}
+
+function percent(value, base) {
+  if (!base) return "0%";
+  return `${Math.round((value / base) * 100)}%`;
 }
 
 function countManagerProcessed(leads, managerCode) {
@@ -302,6 +363,10 @@ function countManagerStageChanges(leads, managerCode) {
 
 function countManagerInterestChanges(leads, managerCode) {
   return leads.flatMap((lead) => lead.currentInterestHistory || []).filter((entry) => entry.managerId === managerCode).length;
+}
+
+function countManagerNeedChanges(leads, managerCode) {
+  return leads.flatMap((lead) => lead.needCategoryHistory || []).filter((entry) => entry.managerId === managerCode).length;
 }
 
 function countManagerProducts(leads, managerCode) {
