@@ -47,7 +47,7 @@ export default function ArchivePage() {
         }
         setLeads([]);
         setDataSource("error");
-        setLoadError(error.message || "Supabase nu raspunde.");
+        setLoadError(error.message || "Baza de date nu raspunde.");
       } finally {
         setLoaded(true);
       }
@@ -189,7 +189,7 @@ function platformLabel(platform) {
 function connectionLabel(dataSource, manager) {
   if (dataSource === "error") return "Eroare de conectare";
   if (dataSource !== "supabase") return "Mod local";
-  return manager?.role === "admin" ? "Conectat la Supabase" : "Totul functioneaza";
+  return manager?.role === "admin" ? "Conectat la baza de date" : "Totul functioneaza";
 }
 
 function connectionMessage(dataSource, manager, loadError, saveState) {

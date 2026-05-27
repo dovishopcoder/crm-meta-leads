@@ -57,7 +57,7 @@ export default function AdminPage() {
 
   async function handleCreateManager(event) {
     event.preventDefault();
-    await submitAdminAction(() => createManager(managerForm), "Manager adaugat si user creat in Supabase Auth.");
+    await submitAdminAction(() => createManager(managerForm), "Manager adaugat si user creat in autentificare.");
     setManagerForm({ name: "", email: "", password: "", role: "manager", color: "#1e8f72" });
   }
 

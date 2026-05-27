@@ -53,7 +53,7 @@ const checklistGroups = [
     title: "Lansare",
     items: [
       { done: true, label: "Aplicatia este publicata pe Vercel." },
-      { done: true, label: "Baza de date ruleaza in Supabase." },
+      { done: true, label: "Baza de date este conectata." },
       { done: false, label: "Curatarea lead-urilor demo inainte de folosire reala." },
       { done: false, label: "Document scurt pentru manageri: cum se prelucreaza un lead." },
       { done: false, label: "Test final pe telefon si desktop cu 2-3 manageri." }
@@ -90,7 +90,7 @@ export default function ChecklistPage() {
           const tasks = await loadProjectChecklistTasks();
           setCustomTasks(tasks);
         } catch (taskError) {
-          setError("Checklist-ul editabil are nevoie de tabelul project_checklist_tasks in Supabase.");
+          setError("Checklist-ul editabil are nevoie de tabelul project_checklist_tasks in baza de date.");
         }
       } finally {
         setLoaded(true);
