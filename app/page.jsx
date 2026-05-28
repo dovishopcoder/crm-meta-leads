@@ -978,6 +978,8 @@ export default function HomePage() {
 function LeadCard({ lead, lookups, onOpen, onDragStart }) {
   const { managerForConfig, stageForConfig, productForConfig } = lookups;
   const overdue = isOverdueLead(lead);
+  const showStage = shouldShowStagePill(lead);
+  const visibleProducts = lead.products?.slice(0, 2) || [];
   return (
     <article className="lead-card" draggable onDragStart={onDragStart} onDoubleClick={onOpen}>
       <Avatar lead={lead} className="avatar" />
@@ -994,10 +996,12 @@ function LeadCard({ lead, lookups, onOpen, onDragStart }) {
           {overdue && <span className="status-pill overdue-pill">Intarziat</span>}
           {lead.priority === "high" && <span className="status-pill">Prioritar</span>}
         </div>
-        <div className="tag-row">
-          <span className="tag-pill">{stageForConfig(lead.stage).name}</span>
-          {lead.products?.slice(0, 2).map((item) => <span key={item.id} className="tag-pill">{productForConfig(item.id).name}</span>)}
-        </div>
+        {(showStage || visibleProducts.length > 0) && (
+          <div className="tag-row">
+            {showStage && <span className="tag-pill">{stageForConfig(lead.stage).name}</span>}
+            {visibleProducts.map((item) => <span key={item.id} className="tag-pill">{productForConfig(item.id).name}</span>)}
+          </div>
+        )}
         {Boolean(lead.tags?.length) && <div className="tag-row">{lead.tags.map((tag) => <span key={tag} className="tag-pill">{tag}</span>)}</div>}
         <div className="lead-actions">
           <button className="mini-btn primary" onClick={onOpen}>Detalii</button>
@@ -1014,6 +1018,7 @@ function EventCard({ lead, lookups, onOpen, onDragStart }) {
   const currentInterest = lead.currentInterest ? currentInterestForConfig(lead.currentInterest).name : "Interes neindicat";
   const followTime = formatFollowTime(lead.followTime);
   const overdue = isOverdueLead(lead);
+  const showStage = shouldShowStagePill(lead);
   return (
     <article className={`event-card ${lead.platform} ${lead.priority === "high" ? "priority-high" : ""}`} draggable onDragStart={onDragStart}>
       <div className="event-card-head">
@@ -1037,7 +1042,7 @@ function EventCard({ lead, lookups, onOpen, onDragStart }) {
         </div>
       )}
       <div className="event-actions">
-        <span className="tag-pill">{stageForConfig(lead.stage).name}</span>
+        {showStage && <span className="tag-pill">{stageForConfig(lead.stage).name}</span>}
         <button className="mini-btn primary" onClick={onOpen}>Detalii</button>
       </div>
       {Boolean(lead.products?.length) && (
@@ -2020,6 +2025,12 @@ function isOverdueLead(lead) {
   const date = parseFollowDate(lead.followDate);
   if (!date) return false;
   return startOfDay(date).getTime() < startOfDay(new Date()).getTime();
+}
+
+function shouldShowStagePill(lead) {
+  const stage = lead?.stage || "new";
+  if (stage !== "new") return true;
+  return !lead?.lastProcessedAt && (lead?.processedCount || 0) === 0;
 }
 
 function isTodayOrFutureFollowDate(value) {
