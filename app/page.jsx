@@ -730,9 +730,9 @@ export default function HomePage() {
     }
   }
 
-  async function sendSelectedMessage(text) {
+  async function sendSelectedMessage(text, options = {}) {
     if (!selectedLead) return;
-    const savedMessage = await sendManyChatMessage(selectedLead.id, text);
+    const savedMessage = await sendManyChatMessage(selectedLead.id, text, options);
     setLeads((current) => current.map((lead) => {
       if (lead.id !== selectedLead.id) return lead;
       return {
@@ -1112,6 +1112,7 @@ function ManualLeadModal({ draft, error, managers, hooks, onChange, onClose, onS
 function ClientModal({ lead, draft, requiresFollowUp, warning, config, isAdmin, lookups, currentManager, onChange, onClose, onArchive, onSave, onSendMessage }) {
   const [activeTab, setActiveTab] = useState("details");
   const [messageDraft, setMessageDraft] = useState("");
+  const [messageImage, setMessageImage] = useState(null);
   const [messageState, setMessageState] = useState("idle");
   const [messageError, setMessageError] = useState("");
   const hasMetaLink = Boolean(lead.metaUrlVerified && lead.metaUrl && lead.metaUrl !== "#");
@@ -1143,13 +1144,14 @@ function ClientModal({ lead, draft, requiresFollowUp, warning, config, isAdmin, 
   async function submitMessage(event) {
     event?.preventDefault();
     const text = messageDraft.trim();
-    if (!text || messageState === "sending") return;
+    if ((!text && !messageImage) || messageState === "sending") return;
 
     try {
       setMessageState("sending");
       setMessageError("");
-      await onSendMessage(text);
+      await onSendMessage(text, { image: messageImage });
       setMessageDraft("");
+      setMessageImage(null);
       setMessageState("sent");
       window.setTimeout(() => setMessageState("idle"), 1400);
     } catch (error) {
@@ -1252,10 +1254,12 @@ function ClientModal({ lead, draft, requiresFollowUp, warning, config, isAdmin, 
           <MessagesPanel
             lead={lead}
             draft={messageDraft}
+            image={messageImage}
             state={messageState}
             error={messageError}
             lookups={lookups}
             onChange={setMessageDraft}
+            onImageChange={setMessageImage}
             onSubmit={submitMessage}
           />
           )}
@@ -1441,11 +1445,12 @@ function ClientHistory({ lead, lookups }) {
   );
 }
 
-function MessagesPanel({ lead, draft, state, error, lookups, onChange, onSubmit }) {
+function MessagesPanel({ lead, draft, image, state, error, lookups, onChange, onImageChange, onSubmit }) {
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
   const [mobileInputMode, setMobileInputMode] = useState(false);
   const messages = [...(lead.messages || [])].sort((left, right) => new Date(left.sentAt || left.createdAt).getTime() - new Date(right.sentAt || right.createdAt).getTime());
-  const canSend = Boolean(draft.trim()) && state !== "sending";
+  const canSend = (Boolean(draft.trim()) || Boolean(image)) && state !== "sending";
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ block: "end" });
@@ -1469,6 +1474,12 @@ function MessagesPanel({ lead, draft, state, error, lookups, onChange, onSubmit 
     if (canSend) onSubmit();
   }
 
+  function handleImagePick(event) {
+    const file = event.target.files?.[0] || null;
+    if (file) onImageChange(file);
+    event.target.value = "";
+  }
+
   return (
     <section className="modal-section messages-section">
       <div className="comments-head">
@@ -1481,9 +1492,11 @@ function MessagesPanel({ lead, draft, state, error, lookups, onChange, onSubmit 
       <div className="messages-list" aria-label="Conversatie client">
         {messages.map((message) => {
           const outgoing = message.direction === "outgoing";
+          const content = parseChatMessageBody(message.body);
           return (
             <article key={message.id || `${message.direction}-${message.sentAt}-${message.body}`} className={`message-bubble ${outgoing ? "outgoing" : "incoming"}`}>
-              <p>{message.body}</p>
+              {content.imageUrl && <img className="message-image" src={content.imageUrl} alt="Imagine trimisa in conversatie" loading="lazy" />}
+              {content.text && <p>{content.text}</p>}
               <div className="message-meta">
                 <span>{outgoing ? lookups.managerForConfig(message.managerId || lead.managerId).name : lead.name}</span>
                 <span>{formatDateTime(message.sentAt || message.createdAt)}</span>
@@ -1497,6 +1510,12 @@ function MessagesPanel({ lead, draft, state, error, lookups, onChange, onSubmit 
       </div>
 
       <div className="message-compose">
+        {image && (
+          <div className="image-attachment-preview">
+            <span>{image.name}</span>
+            <button type="button" onClick={() => onImageChange(null)}>Scoate poza</button>
+          </div>
+        )}
         <textarea
           value={draft}
           onChange={(event) => onChange(event.target.value)}
@@ -1519,6 +1538,16 @@ function MessagesPanel({ lead, draft, state, error, lookups, onChange, onSubmit 
           aria-label="Mesaj catre client"
         />
         <div className="message-compose-actions">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/gif"
+            className="visually-hidden"
+            onChange={handleImagePick}
+          />
+          <button type="button" className="attach-btn" onClick={() => fileInputRef.current?.click()} disabled={state === "sending"}>
+            Poza
+          </button>
           {error && <span className="message-error">{error}</span>}
           {state === "sent" && <span className="message-ok">Trimis</span>}
           <button type="button" className="primary-btn" onClick={onSubmit} disabled={!canSend}>{state === "sending" ? "Se trimite..." : "Trimite mesaj"}</button>
@@ -2031,6 +2060,14 @@ function shouldShowStagePill(lead) {
   const stage = lead?.stage || "new";
   if (stage !== "new") return true;
   return !lead?.lastProcessedAt && (lead?.processedCount || 0) === 0;
+}
+
+function parseChatMessageBody(body) {
+  const value = String(body || "");
+  if (!value.startsWith("[image] ")) return { text: value, imageUrl: "" };
+  const lines = value.slice(8).split("\n");
+  const imageUrl = lines.shift()?.trim() || "";
+  return { imageUrl, text: lines.join("\n").trim() };
 }
 
 function isTodayOrFutureFollowDate(value) {

@@ -397,7 +397,7 @@ export async function loadSupabaseLeads() {
   return data.map((lead) => fromSupabaseLead(lead, refs));
 }
 
-export async function sendManyChatMessage(leadId, text) {
+export async function sendManyChatMessage(leadId, text, options = {}) {
   if (!supabase) throw new Error("Supabase nu este configurat.");
 
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
@@ -405,13 +405,26 @@ export async function sendManyChatMessage(leadId, text) {
   const accessToken = sessionData.session?.access_token;
   if (!accessToken) throw new Error("Sesiunea lipseste.");
 
+  const image = options.image || null;
+  const headers = {
+    Authorization: `Bearer ${accessToken}`
+  };
+  let body;
+
+  if (image) {
+    body = new FormData();
+    body.append("leadId", leadId);
+    body.append("text", text || "");
+    body.append("image", image);
+  } else {
+    headers["Content-Type"] = "application/json";
+    body = JSON.stringify({ leadId, text });
+  }
+
   const response = await fetch("/api/manychat/send", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`
-    },
-    body: JSON.stringify({ leadId, text })
+    headers,
+    body
   });
 
   const responseText = await response.text();

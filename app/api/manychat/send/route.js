@@ -6,6 +6,8 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const manyChatApiKey = process.env.MANYCHAT_API_KEY;
 const manyChatSendEndpoint = process.env.MANYCHAT_SEND_ENDPOINT || "https://api.manychat.com/fb/sending/sendContent";
+const attachmentsBucket = process.env.MESSAGE_ATTACHMENTS_BUCKET || "crm-message-attachments";
+const maxImageSize = 8 * 1024 * 1024;
 
 function serverSupabase() {
   if (!supabaseUrl || !serviceRoleKey) throw new Error("Supabase server env is missing.");
@@ -28,13 +30,15 @@ export async function POST(request) {
 
     const supabase = serverSupabase();
     const manager = await requireActiveManager(token, supabase);
-    const body = await request.json();
+    const body = await readRequestBody(request);
     const leadId = String(body.leadId || "").trim();
     const text = String(body.text || "").trim();
+    const imageFile = body.image || null;
 
     if (!leadId) return NextResponse.json({ error: "Lead-ul lipseste." }, { status: 400 });
-    if (!text) return NextResponse.json({ error: "Scrie mesajul inainte de trimitere." }, { status: 400 });
+    if (!text && !imageFile) return NextResponse.json({ error: "Scrie mesajul sau alege o poza inainte de trimitere." }, { status: 400 });
     if (text.length > 2000) return NextResponse.json({ error: "Mesajul este prea lung." }, { status: 400 });
+    if (imageFile) validateImageFile(imageFile);
 
     const lead = await loadLeadForSending(supabase, leadId);
     const subscriberId = lead.manychat_id || normalizeManyChatId(lead.meta_contact_id);
@@ -42,12 +46,18 @@ export async function POST(request) {
       return NextResponse.json({ error: "Acest lead nu are ID ManyChat pentru trimitere." }, { status: 400 });
     }
 
+    const imageUrl = imageFile ? await uploadMessageImage(supabase, lead.id, imageFile) : "";
+    const messages = [];
+    if (imageUrl) messages.push({ type: "image", url: imageUrl, buttons: [] });
+    if (text) messages.push({ type: "text", text });
+    const storedBody = buildStoredMessageBody(text, imageUrl);
+
     const manyChatPayload = {
       subscriber_id: String(subscriberId),
       data: {
         version: "v2",
         content: {
-          messages: [{ type: "text", text }],
+          messages,
           actions: [],
           quick_replies: []
         }
@@ -69,7 +79,7 @@ export async function POST(request) {
 
     if (!manyChatResponse.ok || responsePayload?.status === "error") {
       const message = manyChatErrorMessage(manyChatResponse.status, responsePayload, responseText);
-      await safeInsertOutgoingMessage(supabase, lead.id, manager.id, text, "failed", "", message);
+      await safeInsertOutgoingMessage(supabase, lead.id, manager.id, storedBody, "failed", "", message);
       return jsonError(message, 400);
     }
 
@@ -77,7 +87,7 @@ export async function POST(request) {
       supabase,
       lead.id,
       manager.id,
-      text,
+      storedBody,
       "sent",
       responsePayload?.data?.message_id || responsePayload?.message_id || "",
       ""
@@ -102,6 +112,73 @@ export async function POST(request) {
     console.error("ManyChat send error:", error);
     return jsonError(error.message || "Mesajul nu a putut fi trimis.", 500);
   }
+}
+
+async function readRequestBody(request) {
+  const contentType = request.headers.get("content-type") || "";
+  if (contentType.includes("multipart/form-data")) {
+    const formData = await request.formData();
+    const image = formData.get("image");
+    return {
+      leadId: formData.get("leadId") || "",
+      text: formData.get("text") || "",
+      image: image instanceof File && image.size > 0 ? image : null
+    };
+  }
+
+  return request.json();
+}
+
+function validateImageFile(file) {
+  const allowedTypes = new Set(["image/jpeg", "image/png", "image/gif"]);
+  if (!allowedTypes.has(file.type)) {
+    throw new Error("Poza trebuie sa fie JPG, PNG sau GIF.");
+  }
+  if (file.size > maxImageSize) {
+    throw new Error("Poza este prea mare. Limita este 8 MB.");
+  }
+}
+
+async function uploadMessageImage(supabase, leadId, file) {
+  await ensureAttachmentsBucket(supabase);
+  const extension = imageExtension(file);
+  const safeLeadId = String(leadId).replace(/[^a-zA-Z0-9-]/g, "");
+  const path = `${safeLeadId}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const { error } = await supabase.storage.from(attachmentsBucket).upload(path, bytes, {
+    contentType: file.type,
+    upsert: false
+  });
+  if (error) throw error;
+
+  const { data } = supabase.storage.from(attachmentsBucket).getPublicUrl(path);
+  if (!data?.publicUrl) throw new Error("Poza a fost incarcata, dar URL-ul public lipseste.");
+  return data.publicUrl;
+}
+
+async function ensureAttachmentsBucket(supabase) {
+  const { data, error } = await supabase.storage.getBucket(attachmentsBucket);
+  if (!error && data) return;
+  const { error: createError } = await supabase.storage.createBucket(attachmentsBucket, {
+    public: true,
+    fileSizeLimit: maxImageSize,
+    allowedMimeTypes: ["image/jpeg", "image/png", "image/gif"]
+  });
+  if (createError && !/already exists/i.test(createError.message || "")) throw createError;
+}
+
+function imageExtension(file) {
+  const byType = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/gif": "gif"
+  };
+  return byType[file.type] || "jpg";
+}
+
+function buildStoredMessageBody(text, imageUrl) {
+  if (!imageUrl) return text;
+  return `[image] ${imageUrl}${text ? `\n${text}` : ""}`;
 }
 
 async function requireActiveManager(token, supabase) {

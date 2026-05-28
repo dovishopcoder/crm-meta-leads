@@ -1291,6 +1291,19 @@ label textarea {
   user-select: text;
 }
 
+.message-image {
+  display: block;
+  width: min(100%, 320px);
+  max-height: 320px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.message-image + p {
+  margin-top: 8px;
+}
+
 .message-meta,
 .message-compose-actions {
   display: flex;
@@ -1311,6 +1324,48 @@ label textarea {
   gap: 8px;
 }
 
+.image-attachment-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid #b8dfd2;
+  border-radius: 8px;
+  background: var(--green-soft);
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.image-attachment-preview span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-attachment-preview button,
+.attach-btn {
+  border: 1px solid var(--green);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--green);
+  font-weight: 850;
+}
+
+.image-attachment-preview button {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.attach-btn {
+  min-height: 40px;
+  padding: 8px 12px;
+}
+
 .message-compose textarea {
   width: 100%;
   resize: vertical;
@@ -1328,6 +1383,18 @@ label textarea {
 
 .message-ok {
   color: var(--green);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .comments-head,
