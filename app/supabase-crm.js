@@ -32,14 +32,29 @@ export async function loadCurrentManager() {
   const session = await getCurrentSession();
   if (!session?.user?.email) return null;
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("managers")
-    .select("id, name, email, role, color, active")
+    .select("id, name, email, role, color, active, organization_id, organizations(id, name, slug)")
     .eq("email", session.user.email)
     .maybeSingle();
 
+  if (error && isMissingLeadColumnError(error, "organization_id")) {
+    const fallback = await supabase
+      .from("managers")
+      .select("id, name, email, role, color, active")
+      .eq("email", session.user.email)
+      .maybeSingle();
+    data = fallback.data;
+    error = fallback.error;
+  }
+
   if (error) throw error;
-  return data ? { ...data, code: managerNameToCode(data.name) } : null;
+  return data ? {
+    ...data,
+    code: managerNameToCode(data.name),
+    organizationId: data.organization_id || data.organizations?.id || "",
+    organizationName: data.organizations?.name || ""
+  } : null;
 }
 
 export async function loadAdminData() {
@@ -109,6 +124,7 @@ export async function deleteProjectChecklistTask(id) {
 export async function loadCrmConfig() {
   const data = await loadAdminData();
   return {
+    organization: data.organization || null,
     managers: data.managers.map((manager) => ({
       id: manager.id,
       code: managerNameToCode(manager.name),
@@ -116,7 +132,8 @@ export async function loadCrmConfig() {
       email: manager.email,
       role: manager.role,
       color: manager.color,
-      active: manager.active
+      active: manager.active,
+      organizationId: manager.organization_id || ""
     })),
     stages: data.stages.map((stage) => ({
       id: stage.code,
@@ -355,10 +372,21 @@ export async function loadSupabaseLeads() {
   if (!supabase) throw new Error("Supabase nu este configurat.");
 
   const refs = await ensureReferenceData();
-  let { data, error } = await supabase
+  const organizationId = refs.organizationId;
+  const applyOrganizationFilter = (query) => (organizationId ? query.eq("organization_id", organizationId) : query);
+  let { data, error } = await applyOrganizationFilter(supabase
     .from("leads")
     .select("*, lead_tags(tag), lead_products(status, proposed_at, manager_id, product_id, products(code, name)), lead_stage_history(from_stage_id, to_stage_id, manager_id, changed_at), lead_interest_history(interest_code, changed_at, manager_id), lead_need_categories(category_code, selected_at, manager_id), lead_need_category_history(category_code, action, changed_at, manager_id), lead_comments(comment, manager_id, created_at), lead_messages(id, direction, body, manager_id, external_id, status, error, sent_at, created_at), lead_activity(type, payload, manager_id, created_at)")
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: true }));
+
+  if (error && isMissingLeadColumnError(error, "organization_id")) {
+    const fallback = await supabase
+      .from("leads")
+      .select("*, lead_tags(tag), lead_products(status, proposed_at, manager_id, product_id, products(code, name)), lead_stage_history(from_stage_id, to_stage_id, manager_id, changed_at), lead_interest_history(interest_code, changed_at, manager_id), lead_need_categories(category_code, selected_at, manager_id), lead_need_category_history(category_code, action, changed_at, manager_id), lead_comments(comment, manager_id, created_at), lead_messages(id, direction, body, manager_id, external_id, status, error, sent_at, created_at), lead_activity(type, payload, manager_id, created_at)")
+      .order("created_at", { ascending: true });
+    data = fallback.data;
+    error = fallback.error;
+  }
 
   if (error && isMissingLeadMessagesError(error)) {
     const fallback = await supabase
@@ -445,6 +473,7 @@ export async function saveSupabaseLead(lead, options = {}) {
   const refs = await ensureReferenceData();
   const now = new Date().toISOString();
   const leadRow = {
+    organization_id: refs.organizationId || null,
     meta_contact_id: lead.metaContactId || lead.id,
     manychat_id: lead.manyChatId || null,
     platform: lead.platform,
@@ -511,19 +540,33 @@ export async function saveSupabaseLead(lead, options = {}) {
 
 async function findExistingLeadByMetaUrl(metaUrl) {
   if (!metaUrl) return null;
-  const { data, error } = await supabase
+  const refs = await ensureReferenceData();
+  let query = supabase
     .from("leads")
     .select("id, first_message_at")
     .eq("meta_url", metaUrl)
     .order("created_at", { ascending: true })
     .limit(1);
+  if (refs.organizationId) query = query.eq("organization_id", refs.organizationId);
+
+  let { data, error } = await query;
+  if (error && refs.organizationId && isMissingLeadColumnError(error, "organization_id")) {
+    const fallback = await supabase
+      .from("leads")
+      .select("id, first_message_at")
+      .eq("meta_url", metaUrl)
+      .order("created_at", { ascending: true })
+      .limit(1);
+    data = fallback.data;
+    error = fallback.error;
+  }
 
   if (error) throw error;
   return data?.[0] || null;
 }
 
 async function saveLeadRowWithColumnFallback(action, leadRow) {
-  const optionalColumns = ["hook", "current_interest", "need_category", "follow_up_time", "manychat_id"];
+  const optionalColumns = ["hook", "current_interest", "need_category", "follow_up_time", "manychat_id", "organization_id"];
   let result = await action();
   let changed = true;
   while (result.error && changed) {
@@ -541,11 +584,32 @@ async function saveLeadRowWithColumnFallback(action, leadRow) {
 }
 
 async function ensureReferenceData() {
-  const [{ data: stageRows }, { data: productRows }, { data: managerRows }] = await Promise.all([
-    supabase.from("stages").select("id, code, name"),
-    supabase.from("products").select("id, code, name"),
-    supabase.from("managers").select("id, name, color")
+  const currentManager = await loadCurrentManager();
+  const organizationId = currentManager?.organizationId || "";
+  const applyOrganizationFilter = (query) => (organizationId ? query.eq("organization_id", organizationId) : query);
+  let [{ data: stageRows, error: stageError }, { data: productRows, error: productError }, { data: managerRows, error: managerError }] = await Promise.all([
+    applyOrganizationFilter(supabase.from("stages").select("id, code, name, organization_id")),
+    applyOrganizationFilter(supabase.from("products").select("id, code, name, organization_id")),
+    applyOrganizationFilter(supabase.from("managers").select("id, name, color, organization_id"))
   ]);
+
+  if ([stageError, productError, managerError].some((error) => error && isMissingLeadColumnError(error, "organization_id"))) {
+    const fallback = await Promise.all([
+      supabase.from("stages").select("id, code, name"),
+      supabase.from("products").select("id, code, name"),
+      supabase.from("managers").select("id, name, color")
+    ]);
+    stageRows = fallback[0].data || [];
+    productRows = fallback[1].data || [];
+    managerRows = fallback[2].data || [];
+    stageError = fallback[0].error;
+    productError = fallback[1].error;
+    managerError = fallback[2].error;
+  }
+
+  for (const error of [stageError, productError, managerError]) {
+    if (error) throw error;
+  }
 
   const managerCodeToUuid = { unassigned: null };
   const managerUuidToCode = {};
@@ -561,7 +625,8 @@ async function ensureReferenceData() {
     productCodeToUuid: Object.fromEntries(productRows.map((product) => [product.code, product.id])),
     productUuidToCode: Object.fromEntries(productRows.map((product) => [product.id, product.code])),
     managerCodeToUuid,
-    managerUuidToCode
+    managerUuidToCode,
+    organizationId
   };
 }
 
@@ -601,7 +666,7 @@ function isMissingNeedCategoryTableError(error) {
 }
 
 function isMissingLeadColumnError(error, column) {
-  return error?.code === "PGRST204" && new RegExp(column, "i").test(error?.message || "");
+  return ["PGRST200", "PGRST204"].includes(error?.code) && new RegExp(`${column}|organizations|schema cache`, "i").test(error?.message || "");
 }
 
 function parseJson(text) {

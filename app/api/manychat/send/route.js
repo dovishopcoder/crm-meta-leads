@@ -40,11 +40,16 @@ export async function POST(request) {
     if (text.length > 2000) return NextResponse.json({ error: "Mesajul este prea lung." }, { status: 400 });
     if (imageFile) validateImageFile(imageFile);
 
-    const lead = await loadLeadForSending(supabase, leadId);
+    const lead = await loadLeadForSending(supabase, leadId, manager.organization_id || "");
     const subscriberId = lead.manychat_id || normalizeManyChatId(lead.meta_contact_id);
     if (!subscriberId) {
       return NextResponse.json({ error: "Acest lead nu are ID ManyChat pentru trimitere." }, { status: 400 });
     }
+
+    const organizationApiKey = lead.organizations?.manychat_api_key || "";
+    const organizationSendEndpoint = lead.organizations?.manychat_send_endpoint || "";
+    const effectiveApiKey = organizationApiKey || manyChatApiKey;
+    const effectiveSendEndpoint = organizationSendEndpoint || manyChatSendEndpoint;
 
     const imageUrl = imageFile ? await uploadMessageImage(supabase, lead.id, imageFile) : "";
     const messages = [];
@@ -64,11 +69,11 @@ export async function POST(request) {
       }
     };
 
-    const manyChatResponse = await fetch(manyChatSendEndpoint, {
+    const manyChatResponse = await fetch(effectiveSendEndpoint, {
       method: "POST",
       headers: {
         Accept: "application/json",
-        Authorization: `Bearer ${manyChatApiKey}`,
+        Authorization: `Bearer ${effectiveApiKey}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify(manyChatPayload)
@@ -186,31 +191,52 @@ async function requireActiveManager(token, supabase) {
   const { data: userData, error: userError } = await authClient.auth.getUser(token);
   if (userError || !userData.user?.email) throw new Error("Sesiunea nu este valida.");
 
-  const { data: manager, error } = await supabase
+  let { data: manager, error } = await supabase
     .from("managers")
-    .select("id, name, role, active")
+    .select("id, name, role, active, organization_id")
     .eq("email", userData.user.email)
     .maybeSingle();
+
+  if (error && isMissingOrganizationColumnError(error)) {
+    const fallback = await supabase
+      .from("managers")
+      .select("id, name, role, active")
+      .eq("email", userData.user.email)
+      .maybeSingle();
+    manager = fallback.data;
+    error = fallback.error;
+  }
 
   if (error) throw error;
   if (!manager?.active) throw new Error("Contul logat nu este manager activ.");
   return { ...manager, code: managerNameToCode(manager.name) };
 }
 
-async function loadLeadForSending(supabase, leadId) {
-  let { data, error } = await supabase
+async function loadLeadForSending(supabase, leadId, organizationId = "") {
+  let query = supabase
     .from("leads")
-    .select("id, meta_contact_id, manychat_id")
-    .eq("id", leadId)
-    .maybeSingle();
+    .select("id, meta_contact_id, manychat_id, organization_id, organizations(manychat_api_key, manychat_send_endpoint)")
+    .eq("id", leadId);
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  let { data, error } = await query.maybeSingle();
 
-  if (error && isMissingManyChatColumnError(error)) {
-    const fallback = await supabase
+  if (error && (isMissingManyChatColumnError(error) || isMissingOrganizationColumnError(error))) {
+    let fallbackQuery = supabase
       .from("leads")
       .select("id, meta_contact_id")
+      .eq("id", leadId);
+    const fallback = await fallbackQuery.maybeSingle();
+    data = fallback.data ? { ...fallback.data, manychat_id: "" } : null;
+    error = fallback.error;
+  }
+
+  if (error && organizationId && isMissingOrganizationColumnError(error)) {
+    const fallback = await supabase
+      .from("leads")
+      .select("id, meta_contact_id, manychat_id")
       .eq("id", leadId)
       .maybeSingle();
-    data = fallback.data ? { ...fallback.data, manychat_id: "" } : null;
+    data = fallback.data;
     error = fallback.error;
   }
 
@@ -298,4 +324,8 @@ function managerNameToCode(name) {
 
 function isMissingManyChatColumnError(error) {
   return error?.code === "PGRST204" && /manychat_id/i.test(error?.message || "");
+}
+
+function isMissingOrganizationColumnError(error) {
+  return error?.code === "PGRST204" && /organization_id|organizations|schema cache/i.test(error?.message || "");
 }

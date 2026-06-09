@@ -23,7 +23,8 @@ export async function POST(request) {
   const payload = await request.json();
   const supabase = serverSupabase();
   const leadInput = normalizeManyChatPayload(payload);
-  const lead = await upsertManyChatLead(supabase, leadInput);
+  const organization = await resolveOrganization(supabase, leadInput);
+  const lead = await upsertManyChatLead(supabase, leadInput, organization);
 
   return NextResponse.json({ ok: true, lead });
 }
@@ -34,8 +35,10 @@ function normalizeManyChatPayload(payload) {
   const firstName = readFirst(payload.first_name, contact.first_name);
   const lastName = readFirst(payload.last_name, contact.last_name);
   const fullName = readFirst(payload.name, payload.full_name, contact.name, contact.full_name, [firstName, lastName].filter(Boolean).join(" "));
+  const page = payload.page || payload.facebook_page || contact.page || {};
 
   return {
+    pageId: readFirst(payload.page_id, payload.facebook_page_id, payload.fb_page_id, page.id, page.page_id, contact.page_id),
     metaContactId: readFirst(payload.meta_contact_id, payload.psid, payload.facebook_id, contact.psid, contact.facebook_id, manyChatId),
     manyChatId: manyChatId || "",
     name: fullName || "Client ManyChat",
@@ -51,17 +54,19 @@ function normalizeManyChatPayload(payload) {
   };
 }
 
-async function upsertManyChatLead(supabase, message) {
+async function upsertManyChatLead(supabase, message, organization) {
   const now = new Date().toISOString();
-  const existing = await findExistingLead(supabase, message);
+  const organizationId = organization?.id || "";
+  const existing = await findExistingLead(supabase, message, organizationId);
 
   if (existing) {
     const wasArchived = Boolean(existing.archived_at);
     const { data: reactivatedStage } = wasArchived
-      ? await supabase.from("stages").select("id").eq("code", "reactivated").maybeSingle()
+      ? await scopedMaybeSingle(supabase.from("stages").select("id").eq("code", "reactivated"), organizationId)
       : { data: null };
 
     const updatePayload = removeUndefined({
+      organization_id: organizationId || undefined,
       meta_contact_id: message.metaContactId || undefined,
       manychat_id: message.manyChatId || undefined,
       name: chooseName(existing.name, message.name),
@@ -92,8 +97,9 @@ async function upsertManyChatLead(supabase, message) {
     return data;
   }
 
-  const { data: stage } = await supabase.from("stages").select("id").eq("code", "new").maybeSingle();
+  const { data: stage } = await scopedMaybeSingle(supabase.from("stages").select("id").eq("code", "new"), organizationId);
   const insertPayload = {
+      organization_id: organizationId || null,
       meta_contact_id: message.metaContactId,
       manychat_id: message.manyChatId || null,
       platform: message.platform,
@@ -127,58 +133,63 @@ async function upsertManyChatLead(supabase, message) {
   return data;
 }
 
-async function findExistingLead(supabase, message) {
+async function findExistingLead(supabase, message, organizationId = "") {
   const idVariants = contactIdVariants(message.metaContactId);
   if (idVariants.length) {
-    const { data, error } = await supabase
-      .from("leads")
-      .select("id, name, avatar_url, meta_contact_id, meta_email, meta_url, meta_url_verified, archived_at")
-      .in("meta_contact_id", idVariants)
-      .order("created_at", { ascending: true })
-      .limit(1);
+    const { data, error } = await scopedLeadLookup(
+      buildLeadLookupQuery(supabase, organizationId).in("meta_contact_id", idVariants),
+      () => buildLeadLookupQuery(supabase, "", false).in("meta_contact_id", idVariants)
+    );
 
     if (error) throw error;
     if (data?.[0]) return data[0];
   }
 
   if (message.email) {
-    const { data, error } = await supabase
-      .from("leads")
-      .select("id, name, avatar_url, meta_contact_id, meta_email, meta_url, meta_url_verified, archived_at")
-      .or(`customer_email.eq.${message.email},email.eq.${message.email},meta_email.eq.${message.email}`)
-      .order("created_at", { ascending: true })
-      .limit(1);
+    const emailFilter = `customer_email.eq.${message.email},email.eq.${message.email},meta_email.eq.${message.email}`;
+    const { data, error } = await scopedLeadLookup(
+      buildLeadLookupQuery(supabase, organizationId).or(emailFilter),
+      () => buildLeadLookupQuery(supabase, "", false).or(emailFilter)
+    );
 
     if (error) throw error;
     if (data?.[0]) return data[0];
   }
 
   if (message.phone) {
-    const { data, error } = await supabase
-      .from("leads")
-      .select("id, name, avatar_url, meta_contact_id, meta_email, meta_url, meta_url_verified, archived_at")
-      .eq("phone", message.phone)
-      .order("created_at", { ascending: true })
-      .limit(1);
+    const { data, error } = await scopedLeadLookup(
+      buildLeadLookupQuery(supabase, organizationId).eq("phone", message.phone),
+      () => buildLeadLookupQuery(supabase, "", false).eq("phone", message.phone)
+    );
 
     if (error) throw error;
     if (data?.[0]) return data[0];
   }
 
   if (message.name) {
-    const { data, error } = await supabase
-      .from("leads")
-      .select("id, name, avatar_url, meta_contact_id, meta_email, meta_url, meta_url_verified, archived_at")
-      .eq("platform", message.platform)
-      .ilike("name", message.name)
-      .order("created_at", { ascending: true })
-      .limit(1);
+    const { data, error } = await scopedLeadLookup(
+      buildLeadLookupQuery(supabase, organizationId).eq("platform", message.platform).ilike("name", message.name),
+      () => buildLeadLookupQuery(supabase, "", false).eq("platform", message.platform).ilike("name", message.name)
+    );
 
     if (error) throw error;
     if (data?.[0]) return data[0];
   }
 
   return null;
+}
+
+function buildLeadLookupQuery(supabase, organizationId, includeOrganization = true) {
+  const columns = includeOrganization
+    ? "id, name, avatar_url, meta_contact_id, meta_email, meta_url, meta_url_verified, archived_at, organization_id"
+    : "id, name, avatar_url, meta_contact_id, meta_email, meta_url, meta_url_verified, archived_at";
+  let query = supabase
+    .from("leads")
+    .select(columns)
+    .order("created_at", { ascending: true })
+    .limit(1);
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  return query;
 }
 
 function readFirst(...values) {
@@ -236,15 +247,72 @@ function removeUndefined(object) {
 
 async function saveLeadMutationWithFallback(action, payload) {
   let result = await action();
-  if (result.error && isMissingManyChatColumnError(result.error) && "manychat_id" in payload) {
-    delete payload.manychat_id;
-    result = await action();
+  let changed = true;
+  while (result.error && changed) {
+    changed = false;
+    if (isMissingManyChatColumnError(result.error) && "manychat_id" in payload) {
+      delete payload.manychat_id;
+      result = await action();
+      changed = true;
+    }
+    if (isMissingOrganizationColumnError(result.error) && "organization_id" in payload) {
+      delete payload.organization_id;
+      result = await action();
+      changed = true;
+    }
   }
   return result;
 }
 
 function isMissingManyChatColumnError(error) {
   return error?.code === "PGRST204" && /manychat_id/i.test(error?.message || "");
+}
+
+function isMissingOrganizationColumnError(error) {
+  return error?.code === "PGRST204" && /organization_id|schema cache/i.test(error?.message || "");
+}
+
+async function resolveOrganization(supabase, message) {
+  const pageId = String(message.pageId || "").trim();
+  if (pageId) {
+    const { data, error } = await supabase
+      .from("organizations")
+      .select("id, name, slug")
+      .or(`manychat_page_id.eq.${pageId},meta_page_id.eq.${pageId}`)
+      .eq("active", true)
+      .maybeSingle();
+    if (!error && data) return data;
+    if (error && !isMissingOrganizationTableError(error)) throw error;
+  }
+
+  const { data, error } = await supabase
+    .from("organizations")
+    .select("id, name, slug")
+    .eq("slug", "dovi-crm")
+    .maybeSingle();
+  if (!error) return data || null;
+  if (isMissingOrganizationTableError(error)) return null;
+  throw error;
+}
+
+function isMissingOrganizationTableError(error) {
+  return error?.code === "42P01" || /organizations|schema cache|does not exist/i.test(error?.message || "");
+}
+
+async function scopedLeadLookup(query, fallback) {
+  const result = await query;
+  if (!result.error) return result;
+  if (isMissingOrganizationColumnError(result.error)) return fallback();
+  return result;
+}
+
+async function scopedMaybeSingle(query, organizationId) {
+  let scoped = query;
+  if (organizationId) scoped = scoped.eq("organization_id", organizationId);
+  const result = await scoped.maybeSingle();
+  if (!result.error) return result;
+  if (organizationId && isMissingOrganizationColumnError(result.error)) return query.maybeSingle();
+  return result;
 }
 
 async function insertActivity(supabase, leadId, type, payload) {

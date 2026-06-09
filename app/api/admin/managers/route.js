@@ -39,11 +39,21 @@ export async function POST(request) {
       return NextResponse.json({ error: "Sesiunea admin nu este valida." }, { status: 401 });
     }
 
-    const { data: adminManager, error: adminError } = await supabase
+    let { data: adminManager, error: adminError } = await supabase
       .from("managers")
-      .select("id, role, active")
+      .select("id, role, active, organization_id")
       .eq("email", userData.user.email)
       .maybeSingle();
+
+    if (adminError && isMissingOrganizationColumnError(adminError)) {
+      const fallback = await supabase
+        .from("managers")
+        .select("id, role, active")
+        .eq("email", userData.user.email)
+        .maybeSingle();
+      adminManager = fallback.data;
+      adminError = fallback.error;
+    }
 
     if (adminError) throw adminError;
     if (adminManager?.role !== "admin" || !adminManager.active) {
@@ -76,14 +86,22 @@ export async function POST(request) {
       return NextResponse.json({ error: createUserError.message }, { status: 400 });
     }
 
-    const { error: managerError } = await supabase.from("managers").insert({
+    const managerPayload = {
       auth_user_id: authData.user.id,
       name,
       email,
       role,
       color,
       active: true
-    });
+    };
+    if (adminManager.organization_id) managerPayload.organization_id = adminManager.organization_id;
+
+    let { error: managerError } = await supabase.from("managers").insert(managerPayload);
+    if (managerError && isMissingOrganizationColumnError(managerError)) {
+      delete managerPayload.organization_id;
+      const retry = await supabase.from("managers").insert(managerPayload);
+      managerError = retry.error;
+    }
 
     if (managerError) throw managerError;
 
@@ -107,11 +125,21 @@ export async function DELETE(request) {
       return NextResponse.json({ error: "Sesiunea admin nu este valida." }, { status: 401 });
     }
 
-    const { data: adminManager, error: adminError } = await supabase
+    let { data: adminManager, error: adminError } = await supabase
       .from("managers")
-      .select("id, role, active")
+      .select("id, role, active, organization_id")
       .eq("email", userData.user.email)
       .maybeSingle();
+
+    if (adminError && isMissingOrganizationColumnError(adminError)) {
+      const fallback = await supabase
+        .from("managers")
+        .select("id, role, active")
+        .eq("email", userData.user.email)
+        .maybeSingle();
+      adminManager = fallback.data;
+      adminError = fallback.error;
+    }
 
     if (adminError) throw adminError;
     if (adminManager?.role !== "admin" || !adminManager.active) {
@@ -128,18 +156,35 @@ export async function DELETE(request) {
       return NextResponse.json({ error: "Nu poti sterge adminul cu care esti logat." }, { status: 400 });
     }
 
-    const { data: manager, error: managerLoadError } = await supabase
+    let managerQuery = supabase
       .from("managers")
       .select("id, auth_user_id")
-      .eq("id", managerId)
-      .maybeSingle();
+      .eq("id", managerId);
+    if (adminManager.organization_id) managerQuery = managerQuery.eq("organization_id", adminManager.organization_id);
+    let { data: manager, error: managerLoadError } = await managerQuery.maybeSingle();
+
+    if (managerLoadError && adminManager.organization_id && isMissingOrganizationColumnError(managerLoadError)) {
+      const fallback = await supabase
+        .from("managers")
+        .select("id, auth_user_id")
+        .eq("id", managerId)
+        .maybeSingle();
+      manager = fallback.data;
+      managerLoadError = fallback.error;
+    }
 
     if (managerLoadError) throw managerLoadError;
     if (!manager) {
       return NextResponse.json({ error: "Managerul nu exista." }, { status: 404 });
     }
 
-    const { error: deleteManagerError } = await supabase.from("managers").delete().eq("id", managerId);
+    let deleteQuery = supabase.from("managers").delete().eq("id", managerId);
+    if (adminManager.organization_id) deleteQuery = deleteQuery.eq("organization_id", adminManager.organization_id);
+    let { error: deleteManagerError } = await deleteQuery;
+    if (deleteManagerError && adminManager.organization_id && isMissingOrganizationColumnError(deleteManagerError)) {
+      const retry = await supabase.from("managers").delete().eq("id", managerId);
+      deleteManagerError = retry.error;
+    }
     if (deleteManagerError) throw deleteManagerError;
 
     if (manager.auth_user_id) {
@@ -169,11 +214,21 @@ export async function PATCH(request) {
       return NextResponse.json({ error: "Sesiunea admin nu este valida." }, { status: 401 });
     }
 
-    const { data: adminManager, error: adminError } = await supabase
+    let { data: adminManager, error: adminError } = await supabase
       .from("managers")
-      .select("id, role, active")
+      .select("id, role, active, organization_id")
       .eq("email", userData.user.email)
       .maybeSingle();
+
+    if (adminError && isMissingOrganizationColumnError(adminError)) {
+      const fallback = await supabase
+        .from("managers")
+        .select("id, role, active")
+        .eq("email", userData.user.email)
+        .maybeSingle();
+      adminManager = fallback.data;
+      adminError = fallback.error;
+    }
 
     if (adminError) throw adminError;
     if (adminManager?.role !== "admin" || !adminManager.active) {
@@ -192,11 +247,22 @@ export async function PATCH(request) {
       return NextResponse.json({ error: "Parola trebuie sa aiba minim 6 caractere." }, { status: 400 });
     }
 
-    const { data: manager, error: managerError } = await supabase
+    let managerQuery = supabase
       .from("managers")
       .select("id, email, auth_user_id")
-      .eq("id", managerId)
-      .maybeSingle();
+      .eq("id", managerId);
+    if (adminManager.organization_id) managerQuery = managerQuery.eq("organization_id", adminManager.organization_id);
+    let { data: manager, error: managerError } = await managerQuery.maybeSingle();
+
+    if (managerError && adminManager.organization_id && isMissingOrganizationColumnError(managerError)) {
+      const fallback = await supabase
+        .from("managers")
+        .select("id, email, auth_user_id")
+        .eq("id", managerId)
+        .maybeSingle();
+      manager = fallback.data;
+      managerError = fallback.error;
+    }
 
     if (managerError) throw managerError;
     if (!manager) {
@@ -231,4 +297,8 @@ function getBearerToken(request) {
   const header = request.headers.get("authorization") || "";
   const match = header.match(/^Bearer\s+(.+)$/i);
   return match?.[1] || "";
+}
+
+function isMissingOrganizationColumnError(error) {
+  return error?.code === "PGRST204" && /organization_id|schema cache/i.test(error?.message || "");
 }

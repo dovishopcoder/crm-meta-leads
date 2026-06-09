@@ -45,8 +45,9 @@ export async function POST(request) {
   const processed = [];
 
   for (const message of messages) {
+    const organization = await resolveOrganization(supabase, message);
     const enrichedMessage = await enrichMessageProfile(message);
-    const lead = await upsertLeadFromMessage(supabase, enrichedMessage);
+    const lead = await upsertLeadFromMessage(supabase, enrichedMessage, organization);
     processed.push({ id: lead.id, name: lead.name, platform: lead.platform });
   }
 
@@ -260,15 +261,29 @@ function findClientParticipant(participants, contactId, pageId) {
   });
 }
 
-async function upsertLeadFromMessage(supabase, message) {
+async function upsertLeadFromMessage(supabase, message, organization) {
   const now = new Date().toISOString();
+  const organizationId = organization?.id || "";
   const contactIds = contactIdVariants(message.metaContactId);
-  const { data: existing, error: existingError } = await supabase
+  let existingQuery = supabase
     .from("leads")
-    .select("id, name, platform, meta_email, meta_url, meta_url_verified, archived_at")
+    .select("id, name, platform, meta_email, meta_url, meta_url_verified, archived_at, organization_id")
     .in("meta_contact_id", contactIds)
     .order("created_at", { ascending: true })
     .limit(1);
+  if (organizationId) existingQuery = existingQuery.eq("organization_id", organizationId);
+  let { data: existing, error: existingError } = await existingQuery;
+
+  if (existingError && organizationId && isMissingOrganizationColumnError(existingError)) {
+    const fallback = await supabase
+      .from("leads")
+      .select("id, name, platform, meta_email, meta_url, meta_url_verified, archived_at")
+      .in("meta_contact_id", contactIds)
+      .order("created_at", { ascending: true })
+      .limit(1);
+    existing = fallback.data;
+    existingError = fallback.error;
+  }
 
   if (existingError) throw existingError;
   const existingLead = existing?.[0];
@@ -276,11 +291,10 @@ async function upsertLeadFromMessage(supabase, message) {
   if (existingLead) {
     const wasArchived = Boolean(existingLead.archived_at);
     const { data: reactivatedStage } = wasArchived
-      ? await supabase.from("stages").select("id").eq("code", "reactivated").maybeSingle()
+      ? await scopedMaybeSingle(supabase.from("stages").select("id").eq("code", "reactivated"), organizationId)
       : { data: null };
-    const { data, error } = await supabase
-      .from("leads")
-      .update({
+    const updatePayload = {
+        organization_id: organizationId || undefined,
         meta_contact_id: message.metaContactId,
         name: message.name,
         avatar_url: message.avatarUrl,
@@ -292,10 +306,13 @@ async function upsertLeadFromMessage(supabase, message) {
         stage_id: wasArchived && reactivatedStage?.id ? reactivatedStage.id : undefined,
         last_message_at: message.messageAt || now,
         updated_at: now
-      })
+      };
+    const { data, error } = await saveLeadMutationWithFallback(() => supabase
+      .from("leads")
+      .update(removeUndefined(updatePayload))
       .eq("id", existingLead.id)
       .select("id, name, platform")
-      .single();
+      .single(), updatePayload);
 
     if (error) throw error;
     await insertActivity(supabase, existingLead.id, wasArchived ? "reactivated_by_message" : "incoming_message", {
@@ -306,10 +323,9 @@ async function upsertLeadFromMessage(supabase, message) {
     return data;
   }
 
-  const { data: stage } = await supabase.from("stages").select("id").eq("code", "new").maybeSingle();
-  const { data, error } = await supabase
-    .from("leads")
-    .insert({
+  const { data: stage } = await scopedMaybeSingle(supabase.from("stages").select("id").eq("code", "new"), organizationId);
+  const insertPayload = {
+      organization_id: organizationId || null,
       meta_contact_id: message.metaContactId,
       platform: normalizePlatform(message.platform),
       name: message.name,
@@ -324,9 +340,12 @@ async function upsertLeadFromMessage(supabase, message) {
       first_message_at: message.messageAt || now,
       last_message_at: message.messageAt || now,
       processed_count: 0
-    })
+    };
+  const { data, error } = await saveLeadMutationWithFallback(() => supabase
+    .from("leads")
+    .insert(insertPayload)
     .select("id, name, platform")
-    .single();
+    .single(), insertPayload);
 
   if (error) throw error;
   await insertActivity(supabase, data.id, "incoming_message", {
@@ -356,6 +375,59 @@ function chooseMetaUrl(existingUrl, existingVerified, generatedUrl, contactId) {
   }
 
   return generatedUrl;
+}
+
+async function resolveOrganization(supabase, message) {
+  const pageId = String(message.pageId || "").trim();
+  if (pageId) {
+    const { data, error } = await supabase
+      .from("organizations")
+      .select("id, name, slug")
+      .or(`meta_page_id.eq.${pageId},manychat_page_id.eq.${pageId}`)
+      .eq("active", true)
+      .maybeSingle();
+    if (!error && data) return data;
+    if (error && !isMissingOrganizationTableError(error)) throw error;
+  }
+
+  const { data, error } = await supabase
+    .from("organizations")
+    .select("id, name, slug")
+    .eq("slug", "dovi-crm")
+    .maybeSingle();
+  if (!error) return data || null;
+  if (isMissingOrganizationTableError(error)) return null;
+  throw error;
+}
+
+async function scopedMaybeSingle(query, organizationId) {
+  let scoped = query;
+  if (organizationId) scoped = scoped.eq("organization_id", organizationId);
+  const result = await scoped.maybeSingle();
+  if (!result.error) return result;
+  if (organizationId && isMissingOrganizationColumnError(result.error)) return query.maybeSingle();
+  return result;
+}
+
+async function saveLeadMutationWithFallback(action, payload) {
+  let result = await action();
+  if (result.error && isMissingOrganizationColumnError(result.error) && "organization_id" in payload) {
+    delete payload.organization_id;
+    result = await action();
+  }
+  return result;
+}
+
+function removeUndefined(object) {
+  return Object.fromEntries(Object.entries(object).filter(([, value]) => value !== undefined));
+}
+
+function isMissingOrganizationColumnError(error) {
+  return error?.code === "PGRST204" && /organization_id|schema cache/i.test(error?.message || "");
+}
+
+function isMissingOrganizationTableError(error) {
+  return error?.code === "42P01" || /organizations|schema cache|does not exist/i.test(error?.message || "");
 }
 
 async function insertActivity(supabase, leadId, type, payload) {

@@ -36,7 +36,9 @@ export function AppNav({ active, manager, systemStatus = "ok" }) {
     window.location.href = "/login";
   }
 
-  const userLabel = `${manager?.name} - ${manager?.role === "admin" ? "Admin" : "Manager"}`;
+  const roleLabel = manager?.role === "admin" ? "Admin" : "Manager";
+  const organizationLabel = manager?.organizationName ? ` · ${manager.organizationName}` : "";
+  const userLabel = `${manager?.name} - ${roleLabel}${organizationLabel}`;
   const statusLabel = systemStatus === "error" ? "Eroare" : "Conectat";
 
   return (
