@@ -1,13 +1,38 @@
 export const legalPages = {
   privacy: {
     title: "Privacy Policy",
-    updatedAt: "Ultima actualizare: 9 iunie 2026",
+    updatedAt: "Last updated: June 9, 2026",
     body: [
-      "Acest document va fi inlocuit cu textul final pregatit pentru NextTouch CRM.",
-      "NextTouch CRM este folosit pentru gestionarea lead-urilor si conversatiilor primite prin Facebook, Instagram si integrari aprobate.",
-      "Datele pot include nume, identificatori de contact, mesaje, note interne, etape de lucru, taguri, produse propuse si informatii de follow-up.",
-      "Datele sunt folosite doar pentru gestionarea relatiei cu persoanele care au contactat organizatia si pentru raportare interna.",
-      "Pentru intrebari despre confidentialitate, contactati administratorul NextTouch CRM."
+      "1. Introduction",
+      "Welcome to NextTouch CRM.",
+      "This Privacy Policy explains how NextTouch CRM (\"we\", \"our\", or \"us\") collects, uses, stores, and protects information when users connect their Facebook Pages, Instagram Business Accounts, and other communication channels to our platform.",
+      "By using NextTouch CRM, you agree to the practices described in this Privacy Policy.",
+      "2. Information We Collect",
+      "When using NextTouch CRM, we may collect:",
+      "User account information; name and email address; Facebook Page information authorized by the user; Instagram Business Account information authorized by the user; customer messages received through connected channels; communication history within the platform; and technical information necessary for platform operation.",
+      "We collect only the information required to provide CRM services.",
+      "3. How We Use Information",
+      "We use collected information to provide CRM functionality, display customer conversations, enable message management and replies, improve platform performance, provide customer support, and maintain platform security.",
+      "We do not sell personal information to third parties.",
+      "4. Data Storage and Security",
+      "We implement reasonable technical and organizational measures to protect information against unauthorized access, alteration, disclosure, or destruction.",
+      "Data is stored on secure infrastructure and accessed only by authorized users and administrators.",
+      "5. Third-Party Services",
+      "NextTouch CRM integrates with third-party platforms, including Meta (Facebook and Instagram) and other communication and automation platforms as configured by users.",
+      "Use of those services is also governed by their respective privacy policies.",
+      "6. Data Retention",
+      "We retain information only as long as necessary to provide services, comply with legal obligations, resolve disputes, and enforce agreements.",
+      "Users may request deletion of their data as described below.",
+      "7. Data Deletion Requests",
+      "Users may request deletion of their account and associated data by contacting: Email: [support@yourdomain.com]",
+      "We will process deletion requests within a reasonable timeframe unless retention is required by law.",
+      "8. Changes to This Policy",
+      "We may update this Privacy Policy periodically.",
+      "Updates will be published on this page.",
+      "9. Contact Information",
+      "Company: [COMPANY NAME]",
+      "Email: [support@yourdomain.com]",
+      "Website: https://crmasd.dovi.shop"
     ]
   },
   terms: {
@@ -33,4 +58,3 @@ export const legalPages = {
     ]
   }
 };
-
