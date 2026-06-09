@@ -68,13 +68,16 @@ export const legalPages = {
   },
   deletion: {
     title: "Data Deletion Instructions",
-    updatedAt: "Ultima actualizare: 9 iunie 2026",
+    updatedAt: "Last updated: June 9, 2026",
     body: [
-      "Acest document va fi inlocuit cu textul final pregatit pentru NextTouch CRM.",
-      "Persoanele care doresc stergerea datelor personale pot trimite o cerere catre administratorul NextTouch CRM.",
-      "Cererea trebuie sa includa numele folosit in conversatie si, daca este posibil, platforma prin care a avut loc contactul: Facebook sau Instagram.",
-      "Dupa verificarea cererii, datele asociate contactului vor fi sterse sau anonimizate, in functie de cerintele legale si operationale aplicabile.",
-      "Pentru cereri de stergere a datelor, contactati administratorul organizatiei care opereaza acest CRM."
+      "If you wish to delete your data associated with NextTouch CRM, please send a request to:",
+      "Email: [support@yourdomain.com]",
+      "Include:",
+      "Your name; email address associated with your account; and the request to delete your account and associated data.",
+      "After verifying your identity, we will process your request within a reasonable period.",
+      "If certain information must be retained for legal, security, or compliance reasons, only the required information will be retained.",
+      "For questions regarding data deletion, contact:",
+      "Email: [support@yourdomain.com]"
     ]
   }
 };
