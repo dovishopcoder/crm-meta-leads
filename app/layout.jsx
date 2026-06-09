@@ -13,7 +13,14 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="ro">
-      <body>{children}</body>
+      <body>
+        {children}
+        <footer className="site-footer">
+          <a href="/privacy-policy">Privacy Policy</a>
+          <a href="/terms-of-service">Terms of Service</a>
+          <a href="/data-deletion">Data Deletion Instructions</a>
+        </footer>
+      </body>
     </html>
   );
 }
