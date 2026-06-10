@@ -7,6 +7,7 @@ import { getCurrentSession, loadCrmConfig, loadCurrentManager, loadSupabaseLeads
 const DAY_MS = 24 * 60 * 60 * 1000;
 const FALLBACK_MANAGER_ID = "diana";
 const PENDING_INBOX_LEAD_KEY = "crm-pending-inbox-lead";
+const META_APP_TEST_START_AT = "2026-06-10T00:00:00.000Z";
 const FOLLOW_HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0"));
 const FOLLOW_MINUTE_OPTIONS = Array.from({ length: 12 }, (_, index) => String(index * 5).padStart(2, "0"));
 
@@ -1860,7 +1861,14 @@ function normalizeLead(lead) {
 }
 
 function isMetaAppLead(lead) {
-  return (lead.activity || []).some((activity) => activity.source === "meta_webhook");
+  const testStartedAt = Date.parse(META_APP_TEST_START_AT);
+
+  return (lead.activity || []).some((activity) => {
+    if (activity.source !== "meta_webhook") return false;
+
+    const activityAt = Date.parse(activity.at || activity.created_at || "");
+    return Number.isFinite(activityAt) && activityAt >= testStartedAt;
+  });
 }
 
 function leadInboxTime(lead) {
