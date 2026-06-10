@@ -15,6 +15,17 @@ const TABLES = {
   needCategory: "need_categories"
 };
 
+const DEFAULT_STAGES = [
+  { code: "new", name: "Nou", position: 1, active: true },
+  { code: "interested", name: "Interesat", position: 2, active: true },
+  { code: "proposal", name: "Propunere facuta", position: 3, active: true },
+  { code: "followup", name: "Follow-up", position: 4, active: true },
+  { code: "accepted", name: "Acceptat", position: 5, active: true },
+  { code: "no-response", name: "Nu raspunde", position: 6, active: true },
+  { code: "reactivated", name: "Reactivat", position: 7, active: true },
+  { code: "closed", name: "Inchis", position: 8, active: true }
+];
+
 const DEFAULT_STATUSES = [
   { code: "new", name: "Nou", position: 1, active: true },
   { code: "scheduled", name: "Programat", position: 2, active: true },
@@ -70,8 +81,9 @@ export async function GET(request) {
   try {
     const supabase = serverSupabase();
     const manager = await requireManager(request, supabase);
-    const organizationId = manager.organization_id || "";
     const globalAdmin = isGlobalAdmin(manager);
+    const requestedOrganizationId = String(new URL(request.url).searchParams.get("organizationId") || "").trim();
+    const organizationId = globalAdmin && requestedOrganizationId ? requestedOrganizationId : manager.organization_id || "";
     const applyOrg = (query) => (organizationId ? query.eq("organization_id", organizationId) : query);
 
     const managerQuery = globalAdmin
@@ -132,6 +144,7 @@ export async function POST(request) {
       if (!payload.name || !payload.slug) return NextResponse.json({ error: "Completeaza numele si slug-ul organizatiei." }, { status: 400 });
       const { data, error } = await supabase.from("organizations").insert(payload).select("id, name, slug, meta_page_id, manychat_page_id, active").single();
       if (error) throw error;
+      await seedOrganizationDefaults(supabase, data.id);
       return NextResponse.json({ ok: true, data });
     }
 
@@ -324,6 +337,23 @@ async function loadOrganizations(supabase, manager, globalAdmin) {
   if (!result.error) return result;
   if (isMissingOrganizationTableError(result.error)) return { data: [], error: null };
   return result;
+}
+
+async function seedOrganizationDefaults(supabase, organizationId) {
+  const seedJobs = [
+    ["stages", DEFAULT_STAGES],
+    ["lead_statuses", DEFAULT_STATUSES],
+    ["religions", DEFAULT_RELIGIONS],
+    ["hook_options", DEFAULT_HOOKS],
+    ["current_interests", DEFAULT_CURRENT_INTERESTS],
+    ["need_categories", DEFAULT_NEED_CATEGORIES]
+  ];
+
+  for (const [table, rows] of seedJobs) {
+    const payload = rows.map((row) => ({ ...row, organization_id: organizationId }));
+    const { error } = await supabase.from(table).insert(payload);
+    if (error && !isMissingOrganizationColumnError(error) && !isMissingTableError(error)) throw error;
+  }
 }
 
 async function nextPosition(supabase, table, organizationId = "") {

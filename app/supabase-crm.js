@@ -57,7 +57,7 @@ export async function loadCurrentManager() {
   } : null;
 }
 
-export async function loadAdminData() {
+export async function loadAdminData(options = {}) {
   if (!supabase) throw new Error("Supabase nu este configurat.");
 
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
@@ -65,7 +65,11 @@ export async function loadAdminData() {
   const accessToken = sessionData.session?.access_token;
   if (!accessToken) throw new Error("Sesiunea admin lipseste.");
 
-  const response = await fetch("/api/admin/settings", {
+  const params = new URLSearchParams();
+  if (options.organizationId) params.set("organizationId", options.organizationId);
+  const url = `/api/admin/settings${params.toString() ? `?${params.toString()}` : ""}`;
+
+  const response = await fetch(url, {
     headers: {
       Authorization: `Bearer ${accessToken}`
     }
@@ -121,8 +125,8 @@ export async function deleteProjectChecklistTask(id) {
   if (error) throw error;
 }
 
-export async function loadCrmConfig() {
-  const data = await loadAdminData();
+export async function loadCrmConfig(options = {}) {
+  const data = await loadAdminData(options);
   return {
     organization: data.organization || null,
     organizations: data.organizations || [],
@@ -380,10 +384,10 @@ async function saveAdminSetting(method, body) {
   return payload.data;
 }
 
-export async function loadSupabaseLeads() {
+export async function loadSupabaseLeads(options = {}) {
   if (!supabase) throw new Error("Supabase nu este configurat.");
 
-  const refs = await ensureReferenceData();
+  const refs = await ensureReferenceData(options.organizationId);
   const organizationId = refs.organizationId;
   const applyOrganizationFilter = (query) => (organizationId ? query.eq("organization_id", organizationId) : query);
   let { data, error } = await applyOrganizationFilter(supabase
@@ -429,11 +433,6 @@ export async function loadSupabaseLeads() {
 
   if (error) throw error;
 
-  if (!data.length) {
-    await seedDemoLeads(refs);
-    return loadSupabaseLeads();
-  }
-
   return data.map((lead) => fromSupabaseLead(lead, refs));
 }
 
@@ -456,9 +455,10 @@ export async function sendManyChatMessage(leadId, text, options = {}) {
     body.append("leadId", leadId);
     body.append("text", text || "");
     body.append("image", image);
+    if (options.organizationId) body.append("organizationId", options.organizationId);
   } else {
     headers["Content-Type"] = "application/json";
-    body = JSON.stringify({ leadId, text });
+    body = JSON.stringify({ leadId, text, organizationId: options.organizationId || "" });
   }
 
   const response = await fetch("/api/manychat/send", {
@@ -482,7 +482,7 @@ export async function sendManyChatMessage(leadId, text, options = {}) {
 export async function saveSupabaseLead(lead, options = {}) {
   if (!supabase) return lead;
 
-  const refs = await ensureReferenceData();
+  const refs = await ensureReferenceData(options.organizationId);
   const now = new Date().toISOString();
   const leadRow = {
     organization_id: refs.organizationId || null,
@@ -521,7 +521,7 @@ export async function saveSupabaseLead(lead, options = {}) {
     const { error } = await saveLeadRowWithColumnFallback(() => supabase.from("leads").update(leadRow).eq("id", lead.id), leadRow);
     if (error) throw error;
   } else {
-    const existingByUrl = await findExistingLeadByMetaUrl(leadRow.meta_url);
+    const existingByUrl = await findExistingLeadByMetaUrl(leadRow.meta_url, refs.organizationId);
     if (existingByUrl?.id) {
       if (options.rejectDuplicateMetaUrl) {
         throw new Error("Acest lead exista deja in CRM. Nu poti crea acelasi lead de doua ori.");
@@ -550,19 +550,18 @@ export async function saveSupabaseLead(lead, options = {}) {
   return { ...lead, id: savedId, metaContactId: leadRow.meta_contact_id };
 }
 
-async function findExistingLeadByMetaUrl(metaUrl) {
+async function findExistingLeadByMetaUrl(metaUrl, organizationId = "") {
   if (!metaUrl) return null;
-  const refs = await ensureReferenceData();
   let query = supabase
     .from("leads")
     .select("id, first_message_at")
     .eq("meta_url", metaUrl)
     .order("created_at", { ascending: true })
     .limit(1);
-  if (refs.organizationId) query = query.eq("organization_id", refs.organizationId);
+  if (organizationId) query = query.eq("organization_id", organizationId);
 
   let { data, error } = await query;
-  if (error && refs.organizationId && isMissingLeadColumnError(error, "organization_id")) {
+  if (error && organizationId && isMissingLeadColumnError(error, "organization_id")) {
     const fallback = await supabase
       .from("leads")
       .select("id, first_message_at")
@@ -595,9 +594,9 @@ async function saveLeadRowWithColumnFallback(action, leadRow) {
   return result;
 }
 
-async function ensureReferenceData() {
+async function ensureReferenceData(organizationIdOverride = "") {
   const currentManager = await loadCurrentManager();
-  const organizationId = currentManager?.organizationId || "";
+  const organizationId = organizationIdOverride || currentManager?.organizationId || "";
   const applyOrganizationFilter = (query) => (organizationId ? query.eq("organization_id", organizationId) : query);
   let [{ data: stageRows, error: stageError }, { data: productRows, error: productError }, { data: managerRows, error: managerError }] = await Promise.all([
     applyOrganizationFilter(supabase.from("stages").select("id, code, name, organization_id")),
