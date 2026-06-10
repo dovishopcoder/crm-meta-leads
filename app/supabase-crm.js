@@ -137,8 +137,8 @@ export async function deleteProjectChecklistTask(id) {
   if (error) throw error;
 }
 
-export async function loadCrmConfig() {
-  const data = await loadAdminData(getActiveOrganizationId());
+export async function loadCrmConfig(organizationId = getActiveOrganizationId()) {
+  const data = await loadAdminData(organizationId);
   return {
     organization: data.organization || null,
     organizations: data.organizations || [],

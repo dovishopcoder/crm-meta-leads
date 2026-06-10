@@ -211,7 +211,7 @@ export default function HomePage() {
   const [loaded, setLoaded] = useState(false);
   const [currentManager, setCurrentManager] = useState(null);
   const [crmConfig, setCrmConfig] = useState({ managers, stages, products, statuses: leadStatuses, religions, hooks, currentInterests, needCategories });
-  const [selectedOrganizationId, setSelectedOrganizationId] = useState("");
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState(() => getActiveOrganizationId());
   const [dataSource, setDataSource] = useState("loading");
   const [loadError, setLoadError] = useState("");
   const [saveState, setSaveState] = useState("idle");
@@ -281,9 +281,16 @@ export default function HomePage() {
         activeManager = manager;
         setCurrentManager(manager);
         const storedOrganizationId = manager.role === "admin" ? getActiveOrganizationId() : "";
-        const nextConfig = await loadCrmConfig();
+        const requestedOrganizationId = organizationId || storedOrganizationId || selectedOrganizationId || "";
+        const nextConfig = await loadCrmConfig(requestedOrganizationId);
         setCrmConfig(nextConfig);
-        activeOrganizationId = organizationId || storedOrganizationId || nextConfig.activeOrganizationId || manager.organizationId || "";
+        activeOrganizationId = requestedOrganizationId || nextConfig.activeOrganizationId || manager.organizationId || "";
+        if (manager.role === "admin" && nextConfig.organizations?.length) {
+          const organizationExists = nextConfig.organizations.some((organization) => organization.id === activeOrganizationId && organization.active !== false);
+          if (!organizationExists) {
+            activeOrganizationId = nextConfig.organizations.find((organization) => organization.active !== false)?.id || activeOrganizationId;
+          }
+        }
         if (manager.role === "admin" && activeOrganizationId) {
           setActiveOrganizationId(activeOrganizationId);
         }
