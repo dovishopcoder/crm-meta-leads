@@ -739,7 +739,7 @@ function AudienceTable({ leads, stages, managers, products, filters, onFiltersCh
   );
 }
 
-function ReadOnlyCells({ type, row }) {
+function ReadOnlyCells({ type, row, globalAdmin = false }) {
   if (type === "manager") {
     return (
       <>
