@@ -70,8 +70,8 @@ export async function GET(request) {
   try {
     const supabase = serverSupabase();
     const manager = await requireManager(request, supabase);
-    const organizationId = manager.organization_id || "";
     const globalAdmin = isGlobalAdmin(manager);
+    const organizationId = getRequestedOrganizationId(request, manager, globalAdmin);
     const applyOrg = (query) => (organizationId ? query.eq("organization_id", organizationId) : query);
 
     const managerQuery = globalAdmin
@@ -81,7 +81,7 @@ export async function GET(request) {
     const [organizationResult, managerResult, stageResult, productResult, statusResult, religionResult, hookResult, currentInterestResult, needCategoryResult, audienceResult] = await Promise.all([
       loadOrganizations(supabase, manager, globalAdmin),
       loadScopedRows(managerQuery, () => supabase.from("managers").select("id, name, email, role, color, active, created_at").order("created_at", { ascending: true })),
-      loadScopedRows(applyOrg(supabase.from("stages").select("id, code, name, position, active, created_at, organization_id").order("position", { ascending: true })), () => supabase.from("stages").select("id, code, name, position, active, created_at").order("position", { ascending: true })),
+      loadSettingRows(supabase, "stages", organizationId),
       loadProductRows(supabase, organizationId),
       loadOptionRows(supabase, "lead_statuses", DEFAULT_STATUSES, organizationId),
       loadOptionRows(supabase, "religions", DEFAULT_RELIGIONS, organizationId),
@@ -105,6 +105,7 @@ export async function GET(request) {
       organization: manager.organizations || null,
       organizations: organizationResult.data || [],
       globalAdmin,
+      activeOrganizationId: organizationId,
       managers: managerResult.data || [],
       stages: stageResult.data || [],
       products: productResult.data || [],
@@ -125,6 +126,8 @@ export async function POST(request) {
     const supabase = serverSupabase();
     const manager = await requireAdmin(request, supabase);
     const body = await request.json();
+    const globalAdmin = isGlobalAdmin(manager);
+    const organizationId = getBodyOrganizationId(body, manager, globalAdmin);
     const type = String(body.type || "").trim();
     if (type === "organization") {
       if (!isGlobalAdmin(manager)) return NextResponse.json({ error: "Doar adminul global poate crea organizatii." }, { status: 403 });
@@ -132,6 +135,7 @@ export async function POST(request) {
       if (!payload.name || !payload.slug) return NextResponse.json({ error: "Completeaza numele si slug-ul organizatiei." }, { status: 400 });
       const { data, error } = await supabase.from("organizations").insert(payload).select("id, name, slug, meta_page_id, manychat_page_id, active").single();
       if (error) throw error;
+      await cloneDefaultSettingsToOrganization(supabase, data.id, manager.organization_id);
       return NextResponse.json({ ok: true, data });
     }
 
@@ -139,12 +143,12 @@ export async function POST(request) {
     if (!table) return NextResponse.json({ error: "Tip setare invalid." }, { status: 400 });
 
     const payload = buildPayload(type, body);
-    if (manager.organization_id) payload.organization_id = manager.organization_id;
+    if (organizationId) payload.organization_id = organizationId;
     if (!payload.code || !payload.name) {
       return NextResponse.json({ error: "Completeaza codul si numele." }, { status: 400 });
     }
     if (payload.position === undefined) {
-      payload.position = await nextPosition(supabase, table, manager.organization_id);
+      payload.position = await nextPosition(supabase, table, organizationId);
     }
 
     let { data, error } = await supabase.from(table).insert(payload).select("*").single();
@@ -172,6 +176,8 @@ export async function PATCH(request) {
     const supabase = serverSupabase();
     const manager = await requireAdmin(request, supabase);
     const body = await request.json();
+    const globalAdmin = isGlobalAdmin(manager);
+    const organizationId = getBodyOrganizationId(body, manager, globalAdmin);
     const type = String(body.type || "").trim();
     if (type === "organization") {
       if (!isGlobalAdmin(manager)) return NextResponse.json({ error: "Doar adminul global poate modifica organizatii." }, { status: 403 });
@@ -188,7 +194,7 @@ export async function PATCH(request) {
     if (!table) return NextResponse.json({ error: "Setarea lipseste." }, { status: 400 });
 
     if (Array.isArray(body.order)) {
-      await updateOrder(supabase, table, body.order, manager.organization_id);
+      await updateOrder(supabase, table, body.order, organizationId);
       return NextResponse.json({ ok: true });
     }
 
@@ -200,7 +206,7 @@ export async function PATCH(request) {
     }
 
     let updateQuery = supabase.from(table).update(payload).eq("id", id);
-    if (manager.organization_id) updateQuery = updateQuery.eq("organization_id", manager.organization_id);
+    if (organizationId) updateQuery = updateQuery.eq("organization_id", organizationId);
     let { data, error } = await updateQuery.select("*").single();
     if (error && isMissingOrganizationColumnError(error)) {
       const retry = await supabase.from(table).update(payload).eq("id", id).select("*").single();
@@ -210,7 +216,7 @@ export async function PATCH(request) {
     if (error && isMissingPositionError(error) && "position" in payload) {
       delete payload.position;
       let retryQuery = supabase.from(table).update(payload).eq("id", id);
-      if (manager.organization_id && "organization_id" in payload) retryQuery = retryQuery.eq("organization_id", manager.organization_id);
+      if (organizationId && "organization_id" in payload) retryQuery = retryQuery.eq("organization_id", organizationId);
       const retry = await retryQuery.select("*").single();
       data = retry.data;
       error = retry.error;
@@ -227,6 +233,8 @@ export async function DELETE(request) {
     const supabase = serverSupabase();
     const manager = await requireAdmin(request, supabase);
     const body = await request.json();
+    const globalAdmin = isGlobalAdmin(manager);
+    const organizationId = getBodyOrganizationId(body, manager, globalAdmin);
     const type = String(body.type || "").trim();
     if (type === "organization") {
       if (!isGlobalAdmin(manager)) return NextResponse.json({ error: "Doar adminul global poate dezactiva organizatii." }, { status: 403 });
@@ -242,9 +250,9 @@ export async function DELETE(request) {
     if (!table || !id) return NextResponse.json({ error: "Setarea lipseste." }, { status: 400 });
 
     let deleteQuery = supabase.from(table).delete().eq("id", id);
-    if (manager.organization_id) deleteQuery = deleteQuery.eq("organization_id", manager.organization_id);
+    if (organizationId) deleteQuery = deleteQuery.eq("organization_id", organizationId);
     let { error } = await deleteQuery;
-    if (error && manager.organization_id && isMissingOrganizationColumnError(error)) {
+    if (error && organizationId && isMissingOrganizationColumnError(error)) {
       const retry = await supabase.from(table).delete().eq("id", id);
       error = retry.error;
     }
@@ -315,6 +323,18 @@ function buildOrganizationPayload(body) {
   };
 }
 
+function getRequestedOrganizationId(request, manager, globalAdmin) {
+  const requested = String(new URL(request.url).searchParams.get("organizationId") || "").trim();
+  if (globalAdmin && requested) return requested;
+  return manager.organization_id || "";
+}
+
+function getBodyOrganizationId(body, manager, globalAdmin) {
+  const requested = String(body.organizationId || body.organization_id || "").trim();
+  if (globalAdmin && requested) return requested;
+  return manager.organization_id || "";
+}
+
 async function loadOrganizations(supabase, manager, globalAdmin) {
   const query = supabase
     .from("organizations")
@@ -324,6 +344,53 @@ async function loadOrganizations(supabase, manager, globalAdmin) {
   if (!result.error) return result;
   if (isMissingOrganizationTableError(result.error)) return { data: [], error: null };
   return result;
+}
+
+async function cloneDefaultSettingsToOrganization(supabase, targetOrganizationId, sourceOrganizationId = "") {
+  if (!targetOrganizationId) return;
+
+  const sourceId = sourceOrganizationId || await findDefaultOrganizationId(supabase);
+  if (!sourceId || sourceId === targetOrganizationId) return;
+
+  for (const table of ["stages", "products", "lead_statuses", "religions", "hook_options", "current_interests", "need_categories"]) {
+    await cloneTableRows(supabase, table, sourceId, targetOrganizationId);
+  }
+}
+
+async function findDefaultOrganizationId(supabase) {
+  const { data } = await supabase
+    .from("organizations")
+    .select("id")
+    .eq("slug", "dovi-crm")
+    .maybeSingle();
+  return data?.id || "";
+}
+
+async function cloneTableRows(supabase, table, sourceOrganizationId, targetOrganizationId) {
+  const existing = await supabase
+    .from(table)
+    .select("id")
+    .eq("organization_id", targetOrganizationId)
+    .limit(1);
+  if (existing.error && isMissingOrganizationColumnError(existing.error)) return;
+  if (existing.error || existing.data?.length) return;
+
+  const source = await supabase
+    .from(table)
+    .select("code, name, position, active")
+    .eq("organization_id", sourceOrganizationId)
+    .order("position", { ascending: true });
+  if (source.error || !source.data?.length) return;
+
+  const rows = source.data.map((row) => ({
+    code: row.code,
+    name: row.name,
+    position: row.position,
+    active: row.active,
+    organization_id: targetOrganizationId
+  }));
+
+  await supabase.from(table).insert(rows);
 }
 
 async function nextPosition(supabase, table, organizationId = "") {
@@ -385,7 +452,8 @@ async function loadProductRows(supabase, organizationId = "") {
       .order("position", { ascending: true });
   }
 
-  if (!result.error) return result;
+  if (!result.error && (result.data?.length || !organizationId)) return result;
+  if (!result.error && organizationId && !result.data?.length) return loadDefaultSettingRows(supabase, "products");
   if (!isMissingPositionError(result.error)) return result;
 
   const fallback = await applyOrg(supabase
@@ -407,7 +475,11 @@ async function loadOptionRows(supabase, table, fallbackRows, organizationId = ""
     .select("id, code, name, position, active, created_at, organization_id")
     .order("position", { ascending: true }));
 
-  if (!result.error) return result;
+  if (!result.error && (result.data?.length || !organizationId)) return result;
+  if (!result.error && organizationId && !result.data?.length) {
+    const defaultRows = await loadDefaultSettingRows(supabase, table);
+    if (defaultRows.data?.length) return defaultRows;
+  }
   if (organizationId && isMissingOrganizationColumnError(result.error)) {
     result = await supabase
       .from(table)
@@ -422,6 +494,34 @@ async function loadOptionRows(supabase, table, fallbackRows, organizationId = ""
     };
   }
   return result;
+}
+
+async function loadSettingRows(supabase, table, organizationId = "") {
+  const applyOrg = (query) => (organizationId ? query.eq("organization_id", organizationId) : query);
+  let result = await applyOrg(supabase
+    .from(table)
+    .select("id, code, name, position, active, created_at, organization_id")
+    .order("position", { ascending: true }));
+
+  if (!result.error && (result.data?.length || !organizationId)) return result;
+  if (!result.error && organizationId && !result.data?.length) return loadDefaultSettingRows(supabase, table);
+  if (result.error && organizationId && isMissingOrganizationColumnError(result.error)) {
+    result = await supabase
+      .from(table)
+      .select("id, code, name, position, active, created_at")
+      .order("position", { ascending: true });
+  }
+  return result;
+}
+
+async function loadDefaultSettingRows(supabase, table) {
+  const defaultOrganizationId = await findDefaultOrganizationId(supabase);
+  if (!defaultOrganizationId) return { data: [], error: null };
+  return supabase
+    .from(table)
+    .select("id, code, name, position, active, created_at, organization_id")
+    .eq("organization_id", defaultOrganizationId)
+    .order("position", { ascending: true });
 }
 
 async function loadScopedRows(query, fallback) {

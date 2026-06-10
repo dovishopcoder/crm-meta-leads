@@ -5,8 +5,23 @@ import { currentInterests, hooks, makeDefaultLeads, needCategories } from "./crm
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const ACTIVE_ORGANIZATION_KEY = "crm-active-organization-id";
 
 export const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
+
+export function getActiveOrganizationId() {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(ACTIVE_ORGANIZATION_KEY) || "";
+}
+
+export function setActiveOrganizationId(organizationId) {
+  if (typeof window === "undefined") return;
+  if (organizationId) {
+    window.localStorage.setItem(ACTIVE_ORGANIZATION_KEY, organizationId);
+  } else {
+    window.localStorage.removeItem(ACTIVE_ORGANIZATION_KEY);
+  }
+}
 
 export async function getCurrentSession() {
   if (!supabase) return null;
@@ -57,7 +72,7 @@ export async function loadCurrentManager() {
   } : null;
 }
 
-export async function loadAdminData() {
+export async function loadAdminData(organizationId = getActiveOrganizationId()) {
   if (!supabase) throw new Error("Supabase nu este configurat.");
 
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
@@ -65,7 +80,8 @@ export async function loadAdminData() {
   const accessToken = sessionData.session?.access_token;
   if (!accessToken) throw new Error("Sesiunea admin lipseste.");
 
-  const response = await fetch("/api/admin/settings", {
+  const url = organizationId ? `/api/admin/settings?organizationId=${encodeURIComponent(organizationId)}` : "/api/admin/settings";
+  const response = await fetch(url, {
     headers: {
       Authorization: `Bearer ${accessToken}`
     }
@@ -122,7 +138,7 @@ export async function deleteProjectChecklistTask(id) {
 }
 
 export async function loadCrmConfig() {
-  const data = await loadAdminData();
+  const data = await loadAdminData(getActiveOrganizationId());
   return {
     organization: data.organization || null,
     organizations: data.organizations || [],
@@ -366,13 +382,16 @@ async function saveAdminSetting(method, body) {
   const accessToken = sessionData.session?.access_token;
   if (!accessToken) throw new Error("Sesiunea admin lipseste.");
 
+  const selectedOrganizationId = getActiveOrganizationId();
   const response = await fetch("/api/admin/settings", {
     method,
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${accessToken}`
     },
-    body: JSON.stringify(body)
+    body: JSON.stringify(selectedOrganizationId && !body.organizationId && body.type !== "organization"
+      ? { ...body, organizationId: selectedOrganizationId }
+      : body)
   });
 
   const payload = await response.json();
@@ -380,10 +399,10 @@ async function saveAdminSetting(method, body) {
   return payload.data;
 }
 
-export async function loadSupabaseLeads() {
+export async function loadSupabaseLeads(organizationOverride = getActiveOrganizationId()) {
   if (!supabase) throw new Error("Supabase nu este configurat.");
 
-  const refs = await ensureReferenceData();
+  const refs = await ensureReferenceData(organizationOverride);
   const organizationId = refs.organizationId;
   const applyOrganizationFilter = (query) => (organizationId ? query.eq("organization_id", organizationId) : query);
   let { data, error } = await applyOrganizationFilter(supabase
@@ -431,7 +450,7 @@ export async function loadSupabaseLeads() {
 
   if (!data.length) {
     await seedDemoLeads(refs);
-    return loadSupabaseLeads();
+    return loadSupabaseLeads(organizationOverride);
   }
 
   return data.map((lead) => fromSupabaseLead(lead, refs));
@@ -482,7 +501,7 @@ export async function sendManyChatMessage(leadId, text, options = {}) {
 export async function saveSupabaseLead(lead, options = {}) {
   if (!supabase) return lead;
 
-  const refs = await ensureReferenceData();
+  const refs = await ensureReferenceData(getActiveOrganizationId());
   const now = new Date().toISOString();
   const leadRow = {
     organization_id: refs.organizationId || null,
@@ -552,7 +571,7 @@ export async function saveSupabaseLead(lead, options = {}) {
 
 async function findExistingLeadByMetaUrl(metaUrl) {
   if (!metaUrl) return null;
-  const refs = await ensureReferenceData();
+  const refs = await ensureReferenceData(getActiveOrganizationId());
   let query = supabase
     .from("leads")
     .select("id, first_message_at")
@@ -595,9 +614,9 @@ async function saveLeadRowWithColumnFallback(action, leadRow) {
   return result;
 }
 
-async function ensureReferenceData() {
+async function ensureReferenceData(organizationOverride = "") {
   const currentManager = await loadCurrentManager();
-  const organizationId = currentManager?.organizationId || "";
+  const organizationId = currentManager?.role === "admin" && organizationOverride ? organizationOverride : currentManager?.organizationId || "";
   const applyOrganizationFilter = (query) => (organizationId ? query.eq("organization_id", organizationId) : query);
   let [{ data: stageRows, error: stageError }, { data: productRows, error: productError }, { data: managerRows, error: managerError }] = await Promise.all([
     applyOrganizationFilter(supabase.from("stages").select("id, code, name, organization_id")),
@@ -623,6 +642,14 @@ async function ensureReferenceData() {
     if (error) throw error;
   }
 
+  if (organizationId && !stageRows?.length) {
+    stageRows = await loadDefaultReferenceRows("stages");
+  }
+
+  if (organizationId && !productRows?.length) {
+    productRows = await loadDefaultReferenceRows("products");
+  }
+
   const managerCodeToUuid = { unassigned: null };
   const managerUuidToCode = {};
   managerRows.forEach((manager) => {
@@ -640,6 +667,22 @@ async function ensureReferenceData() {
     managerUuidToCode,
     organizationId
   };
+}
+
+async function loadDefaultReferenceRows(table) {
+  const { data: organization } = await supabase
+    .from("organizations")
+    .select("id")
+    .eq("slug", "dovi-crm")
+    .maybeSingle();
+  if (!organization?.id) return [];
+
+  const { data, error } = await supabase
+    .from(table)
+    .select("id, code, name, organization_id")
+    .eq("organization_id", organization.id);
+  if (error) return [];
+  return data || [];
 }
 
 async function loadOptionalOptionRows(table, fallbackRows) {

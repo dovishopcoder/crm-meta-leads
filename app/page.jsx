@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppNav } from "./components";
-import { getCurrentSession, loadCrmConfig, loadCurrentManager, loadSupabaseLeads, saveSupabaseLead, sendManyChatMessage, signOut, supabase } from "./supabase-crm";
+import { getActiveOrganizationId, getCurrentSession, loadCrmConfig, loadCurrentManager, loadSupabaseLeads, saveSupabaseLead, sendManyChatMessage, setActiveOrganizationId, signOut, supabase } from "./supabase-crm";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const FALLBACK_MANAGER_ID = "diana";
@@ -211,6 +211,7 @@ export default function HomePage() {
   const [loaded, setLoaded] = useState(false);
   const [currentManager, setCurrentManager] = useState(null);
   const [crmConfig, setCrmConfig] = useState({ managers, stages, products, statuses: leadStatuses, religions, hooks, currentInterests, needCategories });
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState("");
   const [dataSource, setDataSource] = useState("loading");
   const [loadError, setLoadError] = useState("");
   const [saveState, setSaveState] = useState("idle");
@@ -257,10 +258,13 @@ export default function HomePage() {
     setFiltersOpen(false);
   }
 
-  async function refreshCrmData({ keepManager = false, reason = "" } = {}) {
+  async function refreshCrmData({ keepManager = false, reason = "", organizationId = "" } = {}) {
     if (refreshInFlightRef.current) return;
     refreshInFlightRef.current = true;
     try {
+      let activeOrganizationId = organizationId || selectedOrganizationId;
+      let activeManager = currentManager;
+
       if (!keepManager) {
         const session = await getCurrentSession();
         if (!session) {
@@ -274,11 +278,19 @@ export default function HomePage() {
           window.location.href = "/login";
           return;
         }
+        activeManager = manager;
         setCurrentManager(manager);
-        setCrmConfig(await loadCrmConfig());
+        const storedOrganizationId = manager.role === "admin" ? getActiveOrganizationId() : "";
+        const nextConfig = await loadCrmConfig();
+        setCrmConfig(nextConfig);
+        activeOrganizationId = organizationId || storedOrganizationId || nextConfig.activeOrganizationId || manager.organizationId || "";
+        if (manager.role === "admin" && activeOrganizationId) {
+          setActiveOrganizationId(activeOrganizationId);
+        }
+        setSelectedOrganizationId(activeOrganizationId);
       }
 
-      const remoteLeads = await loadSupabaseLeads();
+      const remoteLeads = await loadSupabaseLeads(activeManager?.role === "admin" ? activeOrganizationId : "");
       const nextInboxSignature = inboxSignature(remoteLeads);
       const previousInboxSignature = latestInboxSignatureRef.current;
       setLeads(remoteLeads);
@@ -295,7 +307,7 @@ export default function HomePage() {
         const stored = window.localStorage.getItem("crm-next-leads") || window.localStorage.getItem("crm-leads");
         const initial = stored ? JSON.parse(stored).map(normalizeLead) : makeDefaultLeads();
         setLeads(initial);
-        setCrmConfig({ managers, stages, products, statuses: leadStatuses, religions, hooks, currentInterests, needCategories });
+        setCrmConfig({ managers, stages, products, statuses: leadStatuses, religions, hooks, currentInterests, needCategories, organizations: [] });
         setDataSource("local");
         setLoadError("");
         return;
@@ -307,6 +319,14 @@ export default function HomePage() {
     finally {
       refreshInFlightRef.current = false;
     }
+  }
+
+  async function handleOrganizationChange(event) {
+    const organizationId = event.target.value;
+    setSelectedOrganizationId(organizationId);
+    setActiveOrganizationId(organizationId);
+    setSelectedId(null);
+    await refreshCrmData({ organizationId });
   }
 
   useEffect(() => {
@@ -351,13 +371,13 @@ export default function HomePage() {
     const scheduleRefresh = () => {
       window.clearTimeout(refreshTimer);
       refreshTimer = window.setTimeout(() => {
-        refreshCrmData({ keepManager: true, reason: "realtime" });
+        refreshCrmData({ keepManager: true, reason: "realtime", organizationId: selectedOrganizationId });
       }, 350);
     };
 
     const pollRefresh = () => {
       if (document.hidden) return;
-      refreshCrmData({ keepManager: true, reason: "poll" });
+      refreshCrmData({ keepManager: true, reason: "poll", organizationId: selectedOrganizationId });
     };
 
     pollTimer = window.setInterval(pollRefresh, 8000);
@@ -379,7 +399,7 @@ export default function HomePage() {
       document.removeEventListener("visibilitychange", refreshWhenVisible);
       supabase.removeChannel(channel);
     };
-  }, [dataSource, loaded]);
+  }, [dataSource, loaded, selectedOrganizationId]);
 
   const filteredLeads = useMemo(() => {
     const currentManagerCode = currentManager?.code || FALLBACK_MANAGER_ID;
@@ -410,6 +430,10 @@ export default function HomePage() {
   const activeHooks = (crmConfig.hooks || hooks).filter((hook) => hook.active);
   const activeCurrentInterests = (crmConfig.currentInterests || currentInterests).filter((interest) => interest.active);
   const activeNeedCategories = (crmConfig.needCategories || needCategories).filter((category) => category.active);
+  const activeOrganization = (crmConfig.organizations || []).find((organization) => organization.id === selectedOrganizationId) || crmConfig.organization || null;
+  const navManager = currentManager && activeOrganization
+    ? { ...currentManager, organizationName: activeOrganization.name }
+    : currentManager;
   const unreadCount = leads.filter((lead) => lead.unread && !lead.archived).length;
   const overdueCount = leads.filter(isOverdueLead).length;
   const filtersCount = [activeFilter !== "all", managerFilter !== "all", onlyMyLeads].filter(Boolean).length;
@@ -791,8 +815,22 @@ export default function HomePage() {
   return (
     <main className="app-shell">
       <div className="crm-top-menu">
-        <AppNav active="crm" manager={currentManager} systemStatus={dataSource === "error" || saveState === "error" ? "error" : "ok"} />
+        <AppNav active="crm" manager={navManager} systemStatus={dataSource === "error" || saveState === "error" ? "error" : "ok"} />
       </div>
+
+      {currentManager?.role === "admin" && (crmConfig.organizations || []).length > 1 && (
+        <section className="workspace-switcher" aria-label="Pagina CRM activa">
+          <div>
+            <p className="eyebrow">Pagina activa</p>
+            <select value={selectedOrganizationId} onChange={handleOrganizationChange}>
+              {(crmConfig.organizations || []).filter((organization) => organization.active !== false).map((organization) => (
+                <option key={organization.id} value={organization.id}>{organization.name}</option>
+              ))}
+            </select>
+          </div>
+          <span>{leads.length} contacte</span>
+        </section>
+      )}
 
       <div ref={mobileTabsRef} className="mobile-crm-tabs" role="tablist" aria-label="Interfete CRM">
         <button type="button" className={mobileView === "inbox" ? "active" : ""} onClick={() => switchMobileView("inbox")}>
