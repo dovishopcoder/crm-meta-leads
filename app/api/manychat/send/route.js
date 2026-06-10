@@ -38,7 +38,7 @@ export async function POST(request) {
     if (text.length > 2000) return NextResponse.json({ error: "Mesajul este prea lung." }, { status: 400 });
     if (imageFile) validateImageFile(imageFile);
 
-    const lead = await loadLeadForSending(supabase, leadId, manager.organization_id || "");
+    const lead = await loadLeadForSending(supabase, leadId, isGlobalAdmin(manager) ? "" : manager.organization_id || "");
     const subscriberId = lead.manychat_id || normalizeManyChatId(lead.meta_contact_id);
     const metaRecipientId = normalizeMetaContactId(lead.meta_contact_id);
     const organizationMetaToken = lead.organizations?.meta_page_access_token || "";
@@ -210,14 +210,14 @@ async function requireActiveManager(token, supabase) {
 
   let { data: manager, error } = await supabase
     .from("managers")
-    .select("id, name, role, active, organization_id")
+    .select("id, name, email, role, active, organization_id, organizations(slug)")
     .eq("email", userData.user.email)
     .maybeSingle();
 
   if (error && isMissingOrganizationColumnError(error)) {
     const fallback = await supabase
       .from("managers")
-      .select("id, name, role, active")
+      .select("id, name, email, role, active")
       .eq("email", userData.user.email)
       .maybeSingle();
     manager = fallback.data;
@@ -227,6 +227,16 @@ async function requireActiveManager(token, supabase) {
   if (error) throw error;
   if (!manager?.active) throw new Error("Contul logat nu este manager activ.");
   return { ...manager, code: managerNameToCode(manager.name) };
+}
+
+function isGlobalAdmin(manager) {
+  if (manager?.role !== "admin") return false;
+  const configuredEmails = String(process.env.GLOBAL_ADMIN_EMAILS || "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+  if (configuredEmails.length) return configuredEmails.includes(String(manager.email || "").toLowerCase());
+  return manager.organizations?.slug === "dovi-crm";
 }
 
 async function loadLeadForSending(supabase, leadId, organizationId = "") {
