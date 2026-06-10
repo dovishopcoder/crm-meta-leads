@@ -36,15 +36,13 @@ export async function POST(request) {
     const leadId = String(body.leadId || "").trim();
     const text = String(body.text || "").trim();
     const imageFile = body.image || null;
-    const requestedOrganizationId = String(body.organizationId || "").trim();
 
     if (!leadId) return NextResponse.json({ error: "Lead-ul lipseste." }, { status: 400 });
     if (!text && !imageFile) return NextResponse.json({ error: "Scrie mesajul sau alege o poza inainte de trimitere." }, { status: 400 });
     if (text.length > 2000) return NextResponse.json({ error: "Mesajul este prea lung." }, { status: 400 });
     if (imageFile) validateImageFile(imageFile);
 
-    const organizationId = isGlobalAdmin(manager) && requestedOrganizationId ? requestedOrganizationId : manager.organization_id || "";
-    const lead = await loadLeadForSending(supabase, leadId, organizationId);
+    const lead = await loadLeadForSending(supabase, leadId, manager.organization_id || "");
     const subscriberId = lead.manychat_id || normalizeManyChatId(lead.meta_contact_id);
     const metaRecipientId = normalizeMetaContactId(lead.meta_contact_id);
     const canSendManyChat = Boolean(subscriberId && (lead.manychat_id || String(lead.meta_contact_id || "").startsWith("manychat:")) && manyChatApiKey);
@@ -148,7 +146,6 @@ async function readRequestBody(request) {
     return {
       leadId: formData.get("leadId") || "",
       text: formData.get("text") || "",
-      organizationId: formData.get("organizationId") || "",
       image: image instanceof File && image.size > 0 ? image : null
     };
   }
@@ -215,14 +212,14 @@ async function requireActiveManager(token, supabase) {
 
   let { data: manager, error } = await supabase
     .from("managers")
-    .select("id, name, email, role, active, organization_id, organizations(slug)")
+    .select("id, name, role, active, organization_id")
     .eq("email", userData.user.email)
     .maybeSingle();
 
   if (error && isMissingOrganizationColumnError(error)) {
     const fallback = await supabase
       .from("managers")
-      .select("id, name, email, role, active")
+      .select("id, name, role, active")
       .eq("email", userData.user.email)
       .maybeSingle();
     manager = fallback.data;
@@ -416,16 +413,6 @@ function normalizeMetaContactId(value) {
   const id = String(value || "").trim();
   if (!id || /^manychat:/i.test(id) || /^user:/i.test(id)) return "";
   return id;
-}
-
-function isGlobalAdmin(manager) {
-  if (manager?.role !== "admin") return false;
-  const configuredEmails = String(process.env.GLOBAL_ADMIN_EMAILS || "")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-  if (configuredEmails.length) return configuredEmails.includes(String(manager.email || "").toLowerCase());
-  return manager.organizations?.slug === "dovi-crm";
 }
 
 function managerNameToCode(name) {

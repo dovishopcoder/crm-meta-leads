@@ -2,12 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppNav } from "./components";
-import { createOrganization, getCurrentSession, loadCrmConfig, loadCurrentManager, loadSupabaseLeads, saveSupabaseLead, sendManyChatMessage, signOut, supabase } from "./supabase-crm";
+import { getCurrentSession, loadCrmConfig, loadCurrentManager, loadSupabaseLeads, saveSupabaseLead, sendManyChatMessage, signOut, supabase } from "./supabase-crm";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const FALLBACK_MANAGER_ID = "diana";
 const PENDING_INBOX_LEAD_KEY = "crm-pending-inbox-lead";
-const SELECTED_ORGANIZATION_KEY = "crm-selected-organization";
 const FOLLOW_HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0"));
 const FOLLOW_MINUTE_OPTIONS = Array.from({ length: 12 }, (_, index) => String(index * 5).padStart(2, "0"));
 
@@ -211,10 +210,6 @@ export default function HomePage() {
   const [loaded, setLoaded] = useState(false);
   const [currentManager, setCurrentManager] = useState(null);
   const [crmConfig, setCrmConfig] = useState({ managers, stages, products, statuses: leadStatuses, religions, hooks, currentInterests, needCategories });
-  const [selectedOrganizationId, setSelectedOrganizationId] = useState("");
-  const [pageForm, setPageForm] = useState({ name: "", metaPageId: "" });
-  const [pageError, setPageError] = useState("");
-  const [pageMessage, setPageMessage] = useState("");
   const [dataSource, setDataSource] = useState("loading");
   const [loadError, setLoadError] = useState("");
   const [saveState, setSaveState] = useState("idle");
@@ -260,19 +255,10 @@ export default function HomePage() {
     setFiltersOpen(false);
   }
 
-  function rememberSelectedOrganization(id) {
-    setSelectedOrganizationId(id || "");
-    if (typeof window !== "undefined") {
-      if (id) window.localStorage.setItem(SELECTED_ORGANIZATION_KEY, id);
-      else window.localStorage.removeItem(SELECTED_ORGANIZATION_KEY);
-    }
-  }
-
-  async function refreshCrmData({ keepManager = false, reason = "", organizationId = "" } = {}) {
+  async function refreshCrmData({ keepManager = false, reason = "" } = {}) {
     if (refreshInFlightRef.current) return;
     refreshInFlightRef.current = true;
     try {
-      let activeOrganizationId = organizationId || selectedOrganizationId || (typeof window !== "undefined" ? window.localStorage.getItem(SELECTED_ORGANIZATION_KEY) || "" : "");
       if (!keepManager) {
         const session = await getCurrentSession();
         if (!session) {
@@ -287,24 +273,10 @@ export default function HomePage() {
           return;
         }
         setCurrentManager(manager);
-        let nextConfig = await loadCrmConfig({ organizationId: activeOrganizationId });
-        if (nextConfig.globalAdmin) {
-          const activeOrganizations = (nextConfig.organizations || []).filter((organization) => organization.active !== false);
-          const selectedExists = activeOrganizations.some((organization) => organization.id === activeOrganizationId);
-          const fallbackOrganizationId = selectedExists ? activeOrganizationId : nextConfig.organization?.id || activeOrganizations[0]?.id || "";
-          if (fallbackOrganizationId && fallbackOrganizationId !== activeOrganizationId) {
-            activeOrganizationId = fallbackOrganizationId;
-            nextConfig = await loadCrmConfig({ organizationId: activeOrganizationId });
-          }
-          rememberSelectedOrganization(activeOrganizationId);
-        } else {
-          activeOrganizationId = manager.organizationId || "";
-          rememberSelectedOrganization(activeOrganizationId);
-        }
-        setCrmConfig(nextConfig);
+        setCrmConfig(await loadCrmConfig());
       }
 
-      const remoteLeads = await loadSupabaseLeads({ organizationId: activeOrganizationId });
+      const remoteLeads = await loadSupabaseLeads();
       const nextInboxSignature = inboxSignature(remoteLeads);
       const previousInboxSignature = latestInboxSignatureRef.current;
       setLeads(remoteLeads);
@@ -346,44 +318,6 @@ export default function HomePage() {
 
     loadLeads();
   }, []);
-
-  async function changeActiveOrganization(organizationId) {
-    if (!organizationId || organizationId === selectedOrganizationId) return;
-    rememberSelectedOrganization(organizationId);
-    setSelectedId(null);
-    setDraft(null);
-    setManualLeadOpen(false);
-    setPageError("");
-    setPageMessage("");
-    await refreshCrmData({ organizationId });
-  }
-
-  async function createPageWorkspace(event) {
-    event.preventDefault();
-    const name = pageForm.name.trim();
-    const metaPageId = pageForm.metaPageId.trim();
-    if (!name || !metaPageId) {
-      setPageError("Completeaza numele paginii si Meta Page ID.");
-      return;
-    }
-
-    setPageError("");
-    setPageMessage("");
-    try {
-      const organization = await createOrganization({
-        name,
-        slug: slugifyInput(name),
-        metaPageId,
-        manychatPageId: metaPageId
-      });
-      setPageForm({ name: "", metaPageId: "" });
-      setPageMessage("Pagina a fost adaugata.");
-      rememberSelectedOrganization(organization.id);
-      await refreshCrmData({ organizationId: organization.id });
-    } catch (error) {
-      setPageError(error.message || "Pagina nu a putut fi adaugata.");
-    }
-  }
 
   useEffect(() => {
     if (loaded) {
@@ -443,7 +377,7 @@ export default function HomePage() {
       document.removeEventListener("visibilitychange", refreshWhenVisible);
       supabase.removeChannel(channel);
     };
-  }, [dataSource, loaded, selectedOrganizationId]);
+  }, [dataSource, loaded]);
 
   const filteredLeads = useMemo(() => {
     const currentManagerCode = currentManager?.code || FALLBACK_MANAGER_ID;
@@ -473,8 +407,6 @@ export default function HomePage() {
   const activeHooks = (crmConfig.hooks || hooks).filter((hook) => hook.active);
   const activeCurrentInterests = (crmConfig.currentInterests || currentInterests).filter((interest) => interest.active);
   const activeNeedCategories = (crmConfig.needCategories || needCategories).filter((category) => category.active);
-  const activeOrganizations = (crmConfig.organizations || []).filter((organization) => organization.active !== false);
-  const selectedOrganization = activeOrganizations.find((organization) => organization.id === selectedOrganizationId) || crmConfig.organization;
   const unreadCount = leads.filter((lead) => lead.unread && !lead.archived).length;
   const overdueCount = leads.filter(isOverdueLead).length;
   const filtersCount = [activeFilter !== "all", managerFilter !== "all", onlyMyLeads].filter(Boolean).length;
@@ -560,7 +492,7 @@ export default function HomePage() {
 
       if (updatedLead) {
         setSaveState("saving");
-        saveSupabaseLead(updatedLead, { organizationId: selectedOrganizationId })
+        saveSupabaseLead(updatedLead)
           .then((savedLead) => {
             setSaveError("");
             setSaveState("saved");
@@ -643,7 +575,7 @@ export default function HomePage() {
     };
 
     setSaveState("saving");
-    saveSupabaseLead(lead, { rejectDuplicateMetaUrl: true, organizationId: selectedOrganizationId })
+    saveSupabaseLead(lead, { rejectDuplicateMetaUrl: true })
       .then((savedLead) => {
         setLeads((current) => [savedLead, ...current]);
         setSaveError("");
@@ -800,7 +732,7 @@ export default function HomePage() {
 
   async function sendSelectedMessage(text, options = {}) {
     if (!selectedLead) return;
-    const savedMessage = await sendManyChatMessage(selectedLead.id, text, { ...options, organizationId: selectedOrganizationId });
+    const savedMessage = await sendManyChatMessage(selectedLead.id, text, options);
     setLeads((current) => current.map((lead) => {
       if (lead.id !== selectedLead.id) return lead;
       return {
@@ -858,32 +790,6 @@ export default function HomePage() {
       <div className="crm-top-menu">
         <AppNav active="crm" manager={currentManager} systemStatus={dataSource === "error" || saveState === "error" ? "error" : "ok"} />
       </div>
-
-      {crmConfig.globalAdmin && (
-        <section className="page-workspace-panel" aria-label="Pagina CRM activa">
-          <div className="page-workspace-main">
-            <label>
-              Pagina activa
-              <select value={selectedOrganizationId} onChange={(event) => changeActiveOrganization(event.target.value)}>
-                {activeOrganizations.map((organization) => (
-                  <option key={organization.id} value={organization.id}>{organization.name}</option>
-                ))}
-              </select>
-            </label>
-            <div className="page-workspace-meta">
-              <span>{selectedOrganization?.meta_page_id ? `Meta Page ID: ${selectedOrganization.meta_page_id}` : "Fara Meta Page ID"}</span>
-              <strong>{leads.length} contacte</strong>
-            </div>
-          </div>
-
-          <form className="page-workspace-form" onSubmit={createPageWorkspace}>
-            <input value={pageForm.name} onChange={(event) => setPageForm({ ...pageForm, name: event.target.value })} placeholder="Nume pagina noua" />
-            <input value={pageForm.metaPageId} onChange={(event) => setPageForm({ ...pageForm, metaPageId: event.target.value })} placeholder="Meta Page ID" />
-            <button className="mini-btn primary" type="submit">Adauga pagina</button>
-          </form>
-          {(pageError || pageMessage) && <p className={pageError ? "workspace-error" : "workspace-success"}>{pageError || pageMessage}</p>}
-        </section>
-      )}
 
       <div ref={mobileTabsRef} className="mobile-crm-tabs" role="tablist" aria-label="Interfete CRM">
         <button type="button" className={mobileView === "inbox" ? "active" : ""} onClick={() => switchMobileView("inbox")}>
