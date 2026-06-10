@@ -1860,10 +1860,7 @@ function normalizeLead(lead) {
 }
 
 function isMetaAppLead(lead) {
-  const hasMetaWebhookActivity = (lead.activity || []).some((activity) => activity.source === "meta_webhook");
-  if (hasMetaWebhookActivity) return true;
-  const id = String(lead.metaContactId || "");
-  return Boolean(id && !id.startsWith("manual-") && !lead.manyChatId);
+  return (lead.activity || []).some((activity) => activity.source === "meta_webhook");
 }
 
 function leadInboxTime(lead) {
