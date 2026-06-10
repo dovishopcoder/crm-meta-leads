@@ -223,6 +223,7 @@ export default function HomePage() {
   const [manualLead, setManualLead] = useState(makeEmptyManualLead());
   const [manualError, setManualError] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
+  const [inboxSourceFilter, setInboxSourceFilter] = useState("all");
   const [managerFilter, setManagerFilter] = useState("all");
   const [onlyMyLeads, setOnlyMyLeads] = useState(false);
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
@@ -384,6 +385,7 @@ export default function HomePage() {
     return leads
       .filter((lead) => {
         if (lead.archived) return false;
+        if (inboxSourceFilter === "meta-app" && !isMetaAppLead(lead)) return false;
         if (showUnreadOnly && !lead.unread) return false;
         if (showOverdueOnly && !isOverdueLead(lead)) return false;
         if (activeFilter !== "all" && lead.platform !== activeFilter) return false;
@@ -395,7 +397,7 @@ export default function HomePage() {
         return haystack.includes(search.toLowerCase());
       })
       .sort((left, right) => leadInboxTime(right) - leadInboxTime(left));
-  }, [activeFilter, currentManager, crmConfig, leads, managerFilter, onlyMyLeads, search, showUnreadOnly, showOverdueOnly]);
+  }, [activeFilter, currentManager, crmConfig, inboxSourceFilter, leads, managerFilter, onlyMyLeads, search, showUnreadOnly, showOverdueOnly]);
 
   const visibleDates = useMemo(() => getVisibleDates(cursorDate, view), [cursorDate, view]);
   const selectedLead = leads.find((lead) => lead.id === selectedId);
@@ -816,6 +818,23 @@ export default function HomePage() {
           <input value={search} onChange={(event) => setSearch(event.target.value)} type="search" placeholder="Cauta dupa nume, tag sau platforma" />
         </div>
 
+        <div className="source-test-row" aria-label="Surse inbox">
+          <button
+            type="button"
+            className={inboxSourceFilter === "all" ? "source-test-btn active" : "source-test-btn"}
+            onClick={() => setInboxSourceFilter("all")}
+          >
+            Toate sursele
+          </button>
+          <button
+            type="button"
+            className={inboxSourceFilter === "meta-app" ? "source-test-btn active" : "source-test-btn"}
+            onClick={() => setInboxSourceFilter("meta-app")}
+          >
+            Meta App
+          </button>
+        </div>
+
         <div className="inbox-filter-row">
           <div className="filter-dropdown">
             <button type="button" className="filter-toggle" onClick={() => setFiltersOpen((open) => !open)} aria-expanded={filtersOpen}>
@@ -869,7 +888,9 @@ export default function HomePage() {
 
         <section className="lead-list" aria-label="Lista conversatii">
           {filteredLeads.map((lead) => (
-            <LeadCard key={lead.id} lead={lead} lookups={{ managerForConfig, stageForConfig, productForConfig, statusForConfig }} onOpen={() => openLead(lead, "inbox")} onDragStart={(event) => event.dataTransfer.setData("text/plain", lead.id)} />
+            inboxSourceFilter === "meta-app"
+              ? <MetaAppLeadCard key={lead.id} lead={lead} onOpen={() => openLead(lead, "inbox")} />
+              : <LeadCard key={lead.id} lead={lead} lookups={{ managerForConfig, stageForConfig, productForConfig, statusForConfig }} onOpen={() => openLead(lead, "inbox")} onDragStart={(event) => event.dataTransfer.setData("text/plain", lead.id)} />
           ))}
           {!filteredLeads.length && <p className="empty-day">Nu exista lead-uri pentru filtrul ales.</p>}
         </section>
@@ -1007,6 +1028,19 @@ function LeadCard({ lead, lookups, onOpen, onDragStart }) {
           <button className="mini-btn primary" onClick={onOpen}>Detalii</button>
         </div>
       </div>
+    </article>
+  );
+}
+
+function MetaAppLeadCard({ lead, onOpen }) {
+  return (
+    <article className="meta-app-lead-card" onDoubleClick={onOpen}>
+      <Avatar lead={lead} className="avatar" />
+      <div>
+        <span className="meta-app-source">Meta App</span>
+        <strong>{lead.name}</strong>
+      </div>
+      <button className="mini-btn primary" type="button" onClick={onOpen}>Detalii</button>
     </article>
   );
 }
@@ -1823,6 +1857,13 @@ function normalizeLead(lead) {
     followDate: followDateInputValue(lead.followDate),
     followTime: lead.followTime || extractFollowTime(lead.followDate)
   };
+}
+
+function isMetaAppLead(lead) {
+  const hasMetaWebhookActivity = (lead.activity || []).some((activity) => activity.source === "meta_webhook");
+  if (hasMetaWebhookActivity) return true;
+  const id = String(lead.metaContactId || "");
+  return Boolean(id && !id.startsWith("manual-") && !lead.manyChatId);
 }
 
 function leadInboxTime(lead) {

@@ -383,6 +383,27 @@ label textarea {
   color: var(--green);
 }
 
+.source-test-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.source-test-btn {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  font-weight: 850;
+}
+
+.source-test-btn.active {
+  border-color: var(--green);
+  background: var(--green-soft);
+  color: var(--green);
+}
+
 .lead-list {
   display: flex;
   flex: 1;
@@ -417,6 +438,35 @@ label textarea {
 
 .lead-card.dragging {
   opacity: 0.55;
+}
+
+.meta-app-lead-card {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.meta-app-lead-card strong {
+  display: block;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta-app-source {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
 }
 
 .avatar,
