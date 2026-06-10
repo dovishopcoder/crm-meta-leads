@@ -56,7 +56,7 @@ export async function POST(request) {
 
 function normalizeWebhookPayload(payload) {
   if (payload.test_contact_id || payload.name) {
-    return [{
+      return [{
       metaContactId: payload.test_contact_id || payload.meta_contact_id || `manual-${Date.now()}`,
       name: payload.name || "Client Meta",
       platform: payload.platform || "facebook",
@@ -64,6 +64,8 @@ function normalizeWebhookPayload(payload) {
       email: payload.email || "",
       pageId: payload.page_id || "",
       metaUrl: payload.meta_url || "https://business.facebook.com/latest/inbox/all",
+      text: payload.message_text || payload.text || payload.message || "",
+      externalMessageId: payload.message_id || payload.mid || "",
       messageAt: payload.message_at || new Date().toISOString()
     }];
   }
@@ -84,6 +86,8 @@ function normalizeWebhookPayload(payload) {
         email: value.sender?.email || value.from?.email || value.contact?.email || "",
         pageId: value.recipient?.id || value.page_id || entry.id || "",
         metaUrl: value.meta_url || "https://business.facebook.com/latest/inbox/all",
+        text: value.message?.text || value.text || value.message || "",
+        externalMessageId: value.message?.mid || value.mid || value.message_id || "",
         messageAt: value.timestamp ? new Date(Number(value.timestamp)).toISOString() : new Date().toISOString()
       });
     }
@@ -100,6 +104,8 @@ function normalizeWebhookPayload(payload) {
         email: messaging.sender?.email || "",
         pageId: messaging.recipient?.id || entry.id || "",
         metaUrl: "https://business.facebook.com/latest/inbox/all",
+        text: messaging.message?.text || messaging.postback?.title || "",
+        externalMessageId: messaging.message?.mid || messaging.postback?.mid || "",
         messageAt: messaging.timestamp ? new Date(Number(messaging.timestamp)).toISOString() : new Date().toISOString()
       });
     }
@@ -315,6 +321,7 @@ async function upsertLeadFromMessage(supabase, message, organization) {
       .single(), updatePayload);
 
     if (error) throw error;
+    await insertIncomingMessage(supabase, existingLead.id, message);
     await insertActivity(supabase, existingLead.id, wasArchived ? "reactivated_by_message" : "incoming_message", {
       source: "meta_webhook",
       metaUrlSource: message.metaUrlSource || null,
@@ -348,6 +355,7 @@ async function upsertLeadFromMessage(supabase, message, organization) {
     .single(), insertPayload);
 
   if (error) throw error;
+  await insertIncomingMessage(supabase, data.id, message);
   await insertActivity(supabase, data.id, "incoming_message", {
     source: "meta_webhook",
     created: true,
@@ -436,6 +444,59 @@ async function insertActivity(supabase, leadId, type, payload) {
     type,
     payload
   });
+}
+
+async function insertIncomingMessage(supabase, leadId, message) {
+  if (!message.text) return;
+
+  const externalId = message.externalMessageId || buildMessageExternalId(message);
+  if (externalId) {
+    const { data: existing, error: lookupError } = await supabase
+      .from("lead_messages")
+      .select("id")
+      .eq("external_id", externalId)
+      .limit(1);
+
+    if (lookupError) {
+      if (isMissingMessageTableError(lookupError)) return;
+      throw lookupError;
+    }
+    if (existing?.length) return;
+  }
+
+  const { error } = await supabase.from("lead_messages").insert({
+    lead_id: leadId,
+    direction: "incoming",
+    body: message.text,
+    external_id: externalId || null,
+    status: "received",
+    sent_at: message.messageAt || new Date().toISOString()
+  });
+
+  if (error) {
+    if (isMissingMessageTableError(error)) return;
+    if (error.code === "23505") return;
+    throw error;
+  }
+}
+
+function buildMessageExternalId(message) {
+  if (!message.metaContactId || !message.text) return "";
+  const stamp = message.messageAt || "";
+  return `meta:${message.metaContactId}:${stamp}:${hashText(message.text)}`;
+}
+
+function hashText(value) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash << 5) - hash + value.charCodeAt(index);
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(36);
+}
+
+function isMissingMessageTableError(error) {
+  return error?.code === "42P01" || /lead_messages|schema cache|does not exist/i.test(error?.message || "");
 }
 
 function normalizePlatform(platform) {

@@ -6,6 +6,8 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const manyChatApiKey = process.env.MANYCHAT_API_KEY;
 const manyChatSendEndpoint = process.env.MANYCHAT_SEND_ENDPOINT || "https://api.manychat.com/fb/sending/sendContent";
+const metaPageAccessToken = process.env.META_PAGE_ACCESS_TOKEN;
+const metaGraphVersion = process.env.META_GRAPH_VERSION || "v21.0";
 const attachmentsBucket = process.env.MESSAGE_ATTACHMENTS_BUCKET || "crm-message-attachments";
 const maxImageSize = 8 * 1024 * 1024;
 
@@ -21,8 +23,8 @@ function publicSupabase() {
 
 export async function POST(request) {
   try {
-    if (!manyChatApiKey) {
-      return NextResponse.json({ error: "ManyChat API key nu este configurat pe server." }, { status: 500 });
+    if (!manyChatApiKey && !metaPageAccessToken) {
+      return NextResponse.json({ error: "Puntea de mesaje nu este configurata pe server." }, { status: 500 });
     }
 
     const token = getBearerToken(request);
@@ -42,8 +44,12 @@ export async function POST(request) {
 
     const lead = await loadLeadForSending(supabase, leadId, manager.organization_id || "");
     const subscriberId = lead.manychat_id || normalizeManyChatId(lead.meta_contact_id);
-    if (!subscriberId) {
-      return NextResponse.json({ error: "Acest lead nu are ID ManyChat pentru trimitere." }, { status: 400 });
+    const metaRecipientId = normalizeMetaContactId(lead.meta_contact_id);
+    const canSendManyChat = Boolean(subscriberId && (lead.manychat_id || String(lead.meta_contact_id || "").startsWith("manychat:")) && manyChatApiKey);
+    const canSendMeta = Boolean(metaRecipientId && metaPageAccessToken);
+
+    if (!canSendManyChat && !canSendMeta) {
+      return NextResponse.json({ error: "Acest lead nu are o punte activa pentru trimitere." }, { status: 400 });
     }
 
     const organizationApiKey = lead.organizations?.manychat_api_key || "";
@@ -57,35 +63,48 @@ export async function POST(request) {
     if (text) messages.push({ type: "text", text });
     const storedBody = buildStoredMessageBody(text, imageUrl);
 
-    const manyChatPayload = {
-      subscriber_id: String(subscriberId),
-      data: {
-        version: "v2",
-        content: {
-          messages,
-          actions: [],
-          quick_replies: []
+    let externalMessageId = "";
+
+    if (canSendManyChat) {
+      const manyChatPayload = {
+        subscriber_id: String(subscriberId),
+        data: {
+          version: "v2",
+          content: {
+            messages,
+            actions: [],
+            quick_replies: []
+          }
         }
+      };
+
+      const manyChatResponse = await fetch(effectiveSendEndpoint, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${effectiveApiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(manyChatPayload)
+      });
+
+      const responseText = await manyChatResponse.text();
+      const responsePayload = parseJson(responseText);
+
+      if (!manyChatResponse.ok || responsePayload?.status === "error") {
+        const message = manyChatErrorMessage(manyChatResponse.status, responsePayload, responseText);
+        await safeInsertOutgoingMessage(supabase, lead.id, manager.id, storedBody, "failed", "", message);
+        return jsonError(message, 400);
       }
-    };
 
-    const manyChatResponse = await fetch(effectiveSendEndpoint, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${effectiveApiKey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(manyChatPayload)
-    });
-
-    const responseText = await manyChatResponse.text();
-    const responsePayload = parseJson(responseText);
-
-    if (!manyChatResponse.ok || responsePayload?.status === "error") {
-      const message = manyChatErrorMessage(manyChatResponse.status, responsePayload, responseText);
-      await safeInsertOutgoingMessage(supabase, lead.id, manager.id, storedBody, "failed", "", message);
-      return jsonError(message, 400);
+      externalMessageId = responsePayload?.data?.message_id || responsePayload?.message_id || "";
+    } else {
+      const metaResult = await sendMetaMessages(metaRecipientId, text, imageUrl);
+      if (!metaResult.ok) {
+        await safeInsertOutgoingMessage(supabase, lead.id, manager.id, storedBody, "failed", "", metaResult.error);
+        return jsonError(metaResult.error, 400);
+      }
+      externalMessageId = metaResult.messageId || "";
     }
 
     const savedMessage = await insertOutgoingMessage(
@@ -94,7 +113,7 @@ export async function POST(request) {
       manager.id,
       storedBody,
       "sent",
-      responsePayload?.data?.message_id || responsePayload?.message_id || "",
+      externalMessageId,
       ""
     );
 
@@ -289,6 +308,78 @@ function manyChatErrorMessage(status, payload, text) {
   return `Puntea de mesaje nu a acceptat mesajul. Status: ${status}${cleanText ? `: ${cleanText.slice(0, 180)}` : ""}`;
 }
 
+async function sendMetaMessages(recipientId, text, imageUrl) {
+  const sentIds = [];
+
+  if (imageUrl) {
+    const imageResult = await sendMetaPayload({
+      recipient: { id: String(recipientId) },
+      message: {
+        attachment: {
+          type: "image",
+          payload: { url: imageUrl, is_reusable: true }
+        }
+      }
+    });
+    if (!imageResult.ok) return imageResult;
+    if (imageResult.messageId) sentIds.push(imageResult.messageId);
+  }
+
+  if (text) {
+    const textResult = await sendMetaPayload({
+      recipient: { id: String(recipientId) },
+      message: { text }
+    });
+    if (!textResult.ok) return textResult;
+    if (textResult.messageId) sentIds.push(textResult.messageId);
+  }
+
+  return { ok: true, messageId: sentIds.filter(Boolean).join(",") };
+}
+
+async function sendMetaPayload(payload) {
+  const url = new URL(`https://graph.facebook.com/${metaGraphVersion}/me/messages`);
+  url.searchParams.set("access_token", metaPageAccessToken);
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const responseText = await response.text();
+  const responsePayload = parseJson(responseText);
+
+  if (!response.ok || responsePayload?.error) {
+    return {
+      ok: false,
+      error: metaErrorMessage(response.status, responsePayload, responseText)
+    };
+  }
+
+  return {
+    ok: true,
+    messageId: responsePayload?.message_id || ""
+  };
+}
+
+function metaErrorMessage(status, payload, text) {
+  const message = payload?.error?.message || payload?.message || payload?.error;
+  if (message) {
+    return `Meta a refuzat mesajul: ${message}`;
+  }
+
+  const cleanText = String(text || "").replace(/\s+/g, " ").trim();
+  if (cleanText.startsWith("<!DOCTYPE") || cleanText.startsWith("<html")) {
+    return `Meta nu a raspuns corect. Status: ${status}. Verifica tokenul paginii si permisiunea pages_messaging.`;
+  }
+
+  return `Meta nu a acceptat mesajul. Status: ${status}${cleanText ? `: ${cleanText.slice(0, 180)}` : ""}`;
+}
+
 function isMessagingWindowError(message) {
   const normalized = String(message || "").toLowerCase();
   return normalized.includes("last interaction") && normalized.includes("24 hour");
@@ -316,6 +407,12 @@ function parseJson(text) {
 
 function normalizeManyChatId(value) {
   return String(value || "").trim().replace(/^manychat:/i, "").replace(/^user:/i, "");
+}
+
+function normalizeMetaContactId(value) {
+  const id = String(value || "").trim();
+  if (!id || /^manychat:/i.test(id) || /^user:/i.test(id)) return "";
+  return id;
 }
 
 function managerNameToCode(name) {
