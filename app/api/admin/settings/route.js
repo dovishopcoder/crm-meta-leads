@@ -352,7 +352,7 @@ async function seedOrganizationDefaults(supabase, organizationId) {
   for (const [table, rows] of seedJobs) {
     const payload = rows.map((row) => ({ ...row, organization_id: organizationId }));
     const { error } = await supabase.from(table).insert(payload);
-    if (error && !isDuplicateKeyError(error) && !isMissingOrganizationColumnError(error) && !isMissingTableError(error)) throw error;
+    if (error && !isMissingOrganizationColumnError(error) && !isMissingTableError(error)) throw error;
   }
 }
 
@@ -504,10 +504,6 @@ function isMissingPositionError(error) {
 
 function isMissingOrganizationColumnError(error) {
   return error?.code === "PGRST204" && /organization_id|schema cache/i.test(error?.message || "");
-}
-
-function isDuplicateKeyError(error) {
-  return error?.code === "23505" || /duplicate key value/i.test(error?.message || "");
 }
 
 function getBearerToken(request) {
