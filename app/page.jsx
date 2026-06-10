@@ -372,7 +372,7 @@ export default function HomePage() {
     try {
       const organization = await createOrganization({
         name,
-        slug: slugifyInput(name),
+        slug: slugifyInput(name) || `page-${metaPageId}`,
         metaPageId,
         manychatPageId: metaPageId
       });
