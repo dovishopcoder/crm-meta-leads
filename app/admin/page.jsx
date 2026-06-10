@@ -2,15 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { AppNav } from "../components";
-import { countActiveLeadsForManager, createCurrentInterest, createHook, createLeadStatus, createManager, createNeedCategory, createProduct, createReligion, createStage, deleteAdminSetting, deleteManager, getCurrentSession, loadAdminData, loadCurrentManager, reorderAdminSettings, resetManagerPassword, transferActiveLeads, updateCurrentInterest, updateHook, updateLeadStatus, updateManager, updateNeedCategory, updateProduct, updateReligion, updateStage } from "../supabase-crm";
+import { countActiveLeadsForManager, createCurrentInterest, createHook, createLeadStatus, createManager, createNeedCategory, createOrganization, createProduct, createReligion, createStage, deleteAdminSetting, deleteManager, getCurrentSession, loadAdminData, loadCurrentManager, reorderAdminSettings, resetManagerPassword, transferActiveLeads, updateCurrentInterest, updateHook, updateLeadStatus, updateManager, updateNeedCategory, updateOrganization, updateProduct, updateReligion, updateStage } from "../supabase-crm";
 
 export default function AdminPage() {
   const [currentManager, setCurrentManager] = useState(null);
-  const [adminData, setAdminData] = useState({ managers: [], stages: [], products: [], statuses: [], religions: [], hooks: [], currentInterests: [], needCategories: [] });
+  const [adminData, setAdminData] = useState({ managers: [], organizations: [], globalAdmin: false, stages: [], products: [], statuses: [], religions: [], hooks: [], currentInterests: [], needCategories: [] });
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [managerForm, setManagerForm] = useState({ name: "", email: "", password: "", role: "manager", color: "#1e8f72" });
+  const [managerForm, setManagerForm] = useState({ name: "", email: "", password: "", role: "manager", color: "#1e8f72", organizationId: "" });
+  const [organizationForm, setOrganizationForm] = useState({ name: "", slug: "", metaPageId: "", manychatPageId: "" });
   const [stageForm, setStageForm] = useState({ code: "", name: "", position: "" });
   const [productForm, setProductForm] = useState({ code: "", name: "" });
   const [statusForm, setStatusForm] = useState({ code: "", name: "", position: "" });
@@ -59,7 +60,16 @@ export default function AdminPage() {
   async function handleCreateManager(event) {
     event.preventDefault();
     await submitAdminAction(() => createManager(managerForm), "Manager adaugat si user creat in autentificare.");
-    setManagerForm({ name: "", email: "", password: "", role: "manager", color: "#1e8f72" });
+    setManagerForm({ name: "", email: "", password: "", role: "manager", color: "#1e8f72", organizationId: adminData.organization?.id || "" });
+  }
+
+  async function handleCreateOrganization(event) {
+    event.preventDefault();
+    await submitAdminAction(async () => {
+      const organization = await createOrganization(organizationForm);
+      setAdminData((current) => ({ ...current, organizations: [...(current.organizations || []), organization] }));
+    }, "Organizatia a fost creata.", { refresh: false });
+    setOrganizationForm({ name: "", slug: "", metaPageId: "", manychatPageId: "" });
   }
 
   async function handleCreateStage(event) {
@@ -173,6 +183,7 @@ export default function AdminPage() {
 
     const actions = {
       manager: () => updateManager(editing.id, editForm),
+      organization: () => updateOrganization(editing.id, editForm),
       stage: () => updateStage(editing.id, editForm),
       product: () => updateProduct(editing.id, editForm),
       status: () => updateLeadStatus(editing.id, editForm),
@@ -228,7 +239,8 @@ export default function AdminPage() {
       religion: "religia",
       hook: "hook-ul",
       currentInterest: "interesul actual",
-      needCategory: "need category"
+      needCategory: "need category",
+      organization: "organizatia"
     };
     const confirmed = window.confirm(`Stergi ${labels[type] || "setarea"} "${row.name}"?`);
     if (!confirmed) return;
@@ -300,6 +312,32 @@ export default function AdminPage() {
       )}
 
       <div className="admin-grid">
+        {adminData.globalAdmin && (
+          <section className="admin-card">
+            <h3>Adauga organizatie</h3>
+            <form className="admin-form" onSubmit={handleCreateOrganization} autoComplete="off">
+              <input value={organizationForm.name} onChange={(event) => setOrganizationForm({ ...organizationForm, name: event.target.value, slug: organizationForm.slug || slugifyInput(event.target.value) })} placeholder="Nume organizatie" required />
+              <input value={organizationForm.slug} onChange={(event) => setOrganizationForm({ ...organizationForm, slug: slugifyInput(event.target.value) })} placeholder="slug-organizatie" required />
+              <input value={organizationForm.metaPageId} onChange={(event) => setOrganizationForm({ ...organizationForm, metaPageId: event.target.value })} placeholder="Meta Page ID" />
+              <input value={organizationForm.manychatPageId} onChange={(event) => setOrganizationForm({ ...organizationForm, manychatPageId: event.target.value })} placeholder="ManyChat/Page ID" />
+              <button className="primary-btn" type="submit">Adauga organizatie</button>
+            </form>
+            <AdminTable
+              title="Organizatii"
+              columns={["Nume", "Slug", "Meta Page ID", "ManyChat Page ID", "Activa"]}
+              rows={adminData.organizations || []}
+              type="organization"
+              editing={editing}
+              editForm={editForm}
+              onEdit={startEdit}
+              onEditForm={setEditForm}
+              onSave={saveEdit}
+              onCancel={cancelEdit}
+              onDelete={handleDeleteSetting}
+            />
+          </section>
+        )}
+
         <section className="admin-card">
           <h3>Adauga manager</h3>
           <form className="admin-form" onSubmit={handleCreateManager} autoComplete="off">
@@ -310,6 +348,12 @@ export default function AdminPage() {
               <option value="manager">Manager</option>
               <option value="admin">Admin</option>
             </select>
+            {adminData.globalAdmin && (
+              <select value={managerForm.organizationId} onChange={(event) => setManagerForm({ ...managerForm, organizationId: event.target.value })}>
+                <option value="">Organizatia curenta</option>
+                {(adminData.organizations || []).filter((org) => org.active !== false).map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
+              </select>
+            )}
             <label className="color-field">
               Culoare
               <input type="color" value={managerForm.color} onChange={(event) => setManagerForm({ ...managerForm, color: event.target.value })} />
@@ -318,7 +362,7 @@ export default function AdminPage() {
           </form>
           <AdminTable
             title="Manageri"
-            columns={["Nume", "Email", "Rol", "Activ"]}
+            columns={adminData.globalAdmin ? ["Nume", "Email", "Rol", "Organizatie", "Activ"] : ["Nume", "Email", "Rol", "Activ"]}
             rows={adminData.managers}
             type="manager"
             editing={editing}
@@ -332,6 +376,8 @@ export default function AdminPage() {
             onPasswordReset={handleResetPassword}
             passwordDrafts={passwordDrafts}
             currentManagerId={currentManager?.id}
+            organizations={adminData.organizations || []}
+            globalAdmin={adminData.globalAdmin}
           />
         </section>
 
@@ -540,8 +586,8 @@ function settingKeyForType(type) {
   }[type];
 }
 
-function AdminTable({ title, columns, rows, type, editing, editForm, onEdit, onEditForm, onSave, onCancel, onDelete, onPasswordChange, onPasswordReset, passwordDrafts = {}, currentManagerId, draggedSetting, onDragStart, onDropRow }) {
-  const canReorder = type !== "manager";
+function AdminTable({ title, columns, rows, type, editing, editForm, onEdit, onEditForm, onSave, onCancel, onDelete, onPasswordChange, onPasswordReset, passwordDrafts = {}, currentManagerId, draggedSetting, onDragStart, onDropRow, organizations = [], globalAdmin = false }) {
+  const canReorder = type !== "manager" && type !== "organization";
 
   return (
     <section className="stats-table-card admin-card">
@@ -569,9 +615,9 @@ function AdminTable({ title, columns, rows, type, editing, editForm, onEdit, onE
               >
                 {canReorder && <td><span className="drag-handle" title="Trage pentru a schimba ordinea">drag</span></td>}
                 {isEditing ? (
-                  <EditableCells type={type} form={editForm} onChange={onEditForm} />
+                  <EditableCells type={type} form={editForm} onChange={onEditForm} organizations={organizations} globalAdmin={globalAdmin} />
                 ) : (
-                  <ReadOnlyCells type={type} row={row} />
+                  <ReadOnlyCells type={type} row={row} globalAdmin={globalAdmin} />
                 )}
                 <td>
                   {isEditing ? (
@@ -700,6 +746,19 @@ function ReadOnlyCells({ type, row }) {
         <td>{row.name}</td>
         <td>{row.email || "-"}</td>
         <td>{row.role}</td>
+        {globalAdmin && <td>{row.organizations?.name || "-"}</td>}
+        <td>{row.active ? "Da" : "Nu"}</td>
+      </>
+    );
+  }
+
+  if (type === "organization") {
+    return (
+      <>
+        <td>{row.name}</td>
+        <td>{row.slug}</td>
+        <td>{row.meta_page_id || "-"}</td>
+        <td>{row.manychat_page_id || "-"}</td>
         <td>{row.active ? "Da" : "Nu"}</td>
       </>
     );
@@ -724,7 +783,7 @@ function ReadOnlyCells({ type, row }) {
   );
 }
 
-function EditableCells({ type, form, onChange }) {
+function EditableCells({ type, form, onChange, organizations = [], globalAdmin = false }) {
   function update(field, value) {
     onChange({ ...form, [field]: value });
   }
@@ -735,6 +794,26 @@ function EditableCells({ type, form, onChange }) {
         <td><input className="table-input" value={form.name || ""} onChange={(event) => update("name", event.target.value)} /></td>
         <td><input className="table-input" value={form.email || ""} onChange={(event) => update("email", event.target.value)} /></td>
         <td><select className="table-input" value={form.role || "manager"} onChange={(event) => update("role", event.target.value)}><option value="manager">manager</option><option value="admin">admin</option></select></td>
+        {globalAdmin && (
+          <td>
+            <select className="table-input" value={form.organizationId || form.organization_id || ""} onChange={(event) => update("organizationId", event.target.value)}>
+              <option value="">Fara organizatie</option>
+              {organizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
+            </select>
+          </td>
+        )}
+        <td><select className="table-input" value={String(Boolean(form.active))} onChange={(event) => update("active", event.target.value === "true")}><option value="true">Da</option><option value="false">Nu</option></select></td>
+      </>
+    );
+  }
+
+  if (type === "organization") {
+    return (
+      <>
+        <td><input className="table-input" value={form.name || ""} onChange={(event) => update("name", event.target.value)} /></td>
+        <td><input className="table-input" value={form.slug || ""} onChange={(event) => update("slug", slugifyInput(event.target.value))} /></td>
+        <td><input className="table-input" value={form.metaPageId || form.meta_page_id || ""} onChange={(event) => update("metaPageId", event.target.value)} /></td>
+        <td><input className="table-input" value={form.manychatPageId || form.manychat_page_id || ""} onChange={(event) => update("manychatPageId", event.target.value)} /></td>
         <td><select className="table-input" value={String(Boolean(form.active))} onChange={(event) => update("active", event.target.value === "true")}><option value="true">Da</option><option value="false">Nu</option></select></td>
       </>
     );

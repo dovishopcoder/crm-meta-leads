@@ -71,10 +71,16 @@ export async function GET(request) {
     const supabase = serverSupabase();
     const manager = await requireManager(request, supabase);
     const organizationId = manager.organization_id || "";
+    const globalAdmin = isGlobalAdmin(manager);
     const applyOrg = (query) => (organizationId ? query.eq("organization_id", organizationId) : query);
 
-    const [managerResult, stageResult, productResult, statusResult, religionResult, hookResult, currentInterestResult, needCategoryResult, audienceResult] = await Promise.all([
-      loadScopedRows(applyOrg(supabase.from("managers").select("id, name, email, role, color, active, created_at, organization_id").order("created_at", { ascending: true })), () => supabase.from("managers").select("id, name, email, role, color, active, created_at").order("created_at", { ascending: true })),
+    const managerQuery = globalAdmin
+      ? supabase.from("managers").select("id, name, email, role, color, active, created_at, organization_id, organizations(name, slug)").order("created_at", { ascending: true })
+      : applyOrg(supabase.from("managers").select("id, name, email, role, color, active, created_at, organization_id, organizations(name, slug)").order("created_at", { ascending: true }));
+
+    const [organizationResult, managerResult, stageResult, productResult, statusResult, religionResult, hookResult, currentInterestResult, needCategoryResult, audienceResult] = await Promise.all([
+      loadOrganizations(supabase, manager, globalAdmin),
+      loadScopedRows(managerQuery, () => supabase.from("managers").select("id, name, email, role, color, active, created_at").order("created_at", { ascending: true })),
       loadScopedRows(applyOrg(supabase.from("stages").select("id, code, name, position, active, created_at, organization_id").order("position", { ascending: true })), () => supabase.from("stages").select("id, code, name, position, active, created_at").order("position", { ascending: true })),
       loadProductRows(supabase, organizationId),
       loadOptionRows(supabase, "lead_statuses", DEFAULT_STATUSES, organizationId),
@@ -91,12 +97,14 @@ export async function GET(request) {
         .order("created_at", { ascending: false }))
     ]);
 
-    for (const result of [managerResult, stageResult, productResult, statusResult, religionResult, hookResult, currentInterestResult, needCategoryResult, audienceResult]) {
+    for (const result of [organizationResult, managerResult, stageResult, productResult, statusResult, religionResult, hookResult, currentInterestResult, needCategoryResult, audienceResult]) {
       if (result.error) throw result.error;
     }
 
     return NextResponse.json({
       organization: manager.organizations || null,
+      organizations: organizationResult.data || [],
+      globalAdmin,
       managers: managerResult.data || [],
       stages: stageResult.data || [],
       products: productResult.data || [],
@@ -118,6 +126,15 @@ export async function POST(request) {
     const manager = await requireAdmin(request, supabase);
     const body = await request.json();
     const type = String(body.type || "").trim();
+    if (type === "organization") {
+      if (!isGlobalAdmin(manager)) return NextResponse.json({ error: "Doar adminul global poate crea organizatii." }, { status: 403 });
+      const payload = buildOrganizationPayload(body);
+      if (!payload.name || !payload.slug) return NextResponse.json({ error: "Completeaza numele si slug-ul organizatiei." }, { status: 400 });
+      const { data, error } = await supabase.from("organizations").insert(payload).select("id, name, slug, meta_page_id, manychat_page_id, active").single();
+      if (error) throw error;
+      return NextResponse.json({ ok: true, data });
+    }
+
     const table = TABLES[type];
     if (!table) return NextResponse.json({ error: "Tip setare invalid." }, { status: 400 });
 
@@ -156,6 +173,16 @@ export async function PATCH(request) {
     const manager = await requireAdmin(request, supabase);
     const body = await request.json();
     const type = String(body.type || "").trim();
+    if (type === "organization") {
+      if (!isGlobalAdmin(manager)) return NextResponse.json({ error: "Doar adminul global poate modifica organizatii." }, { status: 403 });
+      const id = String(body.id || "").trim();
+      if (!id) return NextResponse.json({ error: "Organizatia lipseste." }, { status: 400 });
+      const payload = buildOrganizationPayload(body);
+      const { data, error } = await supabase.from("organizations").update(payload).eq("id", id).select("id, name, slug, meta_page_id, manychat_page_id, active").single();
+      if (error) throw error;
+      return NextResponse.json({ ok: true, data });
+    }
+
     const table = TABLES[type];
     const id = String(body.id || "").trim();
     if (!table) return NextResponse.json({ error: "Setarea lipseste." }, { status: 400 });
@@ -201,6 +228,15 @@ export async function DELETE(request) {
     const manager = await requireAdmin(request, supabase);
     const body = await request.json();
     const type = String(body.type || "").trim();
+    if (type === "organization") {
+      if (!isGlobalAdmin(manager)) return NextResponse.json({ error: "Doar adminul global poate dezactiva organizatii." }, { status: 403 });
+      const id = String(body.id || "").trim();
+      if (!id || id === manager.organization_id) return NextResponse.json({ error: "Organizatia nu poate fi dezactivata." }, { status: 400 });
+      const { error } = await supabase.from("organizations").update({ active: false, updated_at: new Date().toISOString() }).eq("id", id);
+      if (error) throw error;
+      return NextResponse.json({ ok: true });
+    }
+
     const table = TABLES[type];
     const id = String(body.id || "").trim();
     if (!table || !id) return NextResponse.json({ error: "Setarea lipseste." }, { status: 400 });
@@ -235,7 +271,7 @@ async function requireManager(request, supabase) {
 
   let { data: adminManager, error: adminError } = await supabase
     .from("managers")
-    .select("id, role, active, organization_id, organizations(id, name, slug)")
+    .select("id, email, role, active, organization_id, organizations(id, name, slug)")
     .eq("email", userData.user.email)
     .maybeSingle();
 
@@ -266,6 +302,28 @@ function buildPayload(type, body) {
   }
 
   return payload;
+}
+
+function buildOrganizationPayload(body) {
+  return {
+    name: String(body.name || "").trim(),
+    slug: String(body.slug || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""),
+    meta_page_id: String(body.metaPageId || body.meta_page_id || "").trim() || null,
+    manychat_page_id: String(body.manychatPageId || body.manychat_page_id || "").trim() || null,
+    active: body.active !== false,
+    updated_at: new Date().toISOString()
+  };
+}
+
+async function loadOrganizations(supabase, manager, globalAdmin) {
+  const query = supabase
+    .from("organizations")
+    .select("id, name, slug, meta_page_id, manychat_page_id, active, created_at")
+    .order("created_at", { ascending: true });
+  const result = globalAdmin || !manager.organization_id ? await query : await query.eq("id", manager.organization_id);
+  if (!result.error) return result;
+  if (isMissingOrganizationTableError(result.error)) return { data: [], error: null };
+  return result;
 }
 
 async function nextPosition(supabase, table, organizationId = "") {
@@ -394,6 +452,20 @@ function toAudienceLead(row) {
 
 function isMissingTableError(error) {
   return error?.code === "42P01" || /schema cache|does not exist|Could not find the table/i.test(error?.message || "");
+}
+
+function isGlobalAdmin(manager) {
+  if (manager?.role !== "admin") return false;
+  const configuredEmails = String(process.env.GLOBAL_ADMIN_EMAILS || "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+  if (configuredEmails.length) return configuredEmails.includes(String(manager.email || "").toLowerCase());
+  return manager.organizations?.slug === "dovi-crm";
+}
+
+function isMissingOrganizationTableError(error) {
+  return error?.code === "42P01" || /organizations|schema cache|does not exist/i.test(error?.message || "");
 }
 
 function isMissingPositionError(error) {

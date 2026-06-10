@@ -41,7 +41,7 @@ export async function POST(request) {
 
     let { data: adminManager, error: adminError } = await supabase
       .from("managers")
-      .select("id, role, active, organization_id")
+      .select("id, email, role, active, organization_id, organizations(slug)")
       .eq("email", userData.user.email)
       .maybeSingle();
 
@@ -66,6 +66,7 @@ export async function POST(request) {
     const password = String(body.password || "");
     const role = body.role === "admin" ? "admin" : "manager";
     const color = String(body.color || "#1e8f72").trim() || "#1e8f72";
+    const requestedOrganizationId = String(body.organizationId || body.organization_id || "").trim();
 
     if (!name || !email || !password) {
       return NextResponse.json({ error: "Completeaza nume, email si parola temporara." }, { status: 400 });
@@ -94,7 +95,11 @@ export async function POST(request) {
       color,
       active: true
     };
-    if (adminManager.organization_id) managerPayload.organization_id = adminManager.organization_id;
+    if (isGlobalAdmin(adminManager) && requestedOrganizationId) {
+      managerPayload.organization_id = requestedOrganizationId;
+    } else if (adminManager.organization_id) {
+      managerPayload.organization_id = adminManager.organization_id;
+    }
 
     let { error: managerError } = await supabase.from("managers").insert(managerPayload);
     if (managerError && isMissingOrganizationColumnError(managerError)) {
@@ -127,7 +132,7 @@ export async function DELETE(request) {
 
     let { data: adminManager, error: adminError } = await supabase
       .from("managers")
-      .select("id, role, active, organization_id")
+      .select("id, email, role, active, organization_id, organizations(slug)")
       .eq("email", userData.user.email)
       .maybeSingle();
 
@@ -216,7 +221,7 @@ export async function PATCH(request) {
 
     let { data: adminManager, error: adminError } = await supabase
       .from("managers")
-      .select("id, role, active, organization_id")
+      .select("id, email, role, active, organization_id, organizations(slug)")
       .eq("email", userData.user.email)
       .maybeSingle();
 
@@ -301,4 +306,14 @@ function getBearerToken(request) {
 
 function isMissingOrganizationColumnError(error) {
   return error?.code === "PGRST204" && /organization_id|schema cache/i.test(error?.message || "");
+}
+
+function isGlobalAdmin(manager) {
+  if (manager?.role !== "admin") return false;
+  const configuredEmails = String(process.env.GLOBAL_ADMIN_EMAILS || "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+  if (configuredEmails.length) return configuredEmails.includes(String(manager.email || "").toLowerCase());
+  return manager.organizations?.slug === "dovi-crm";
 }

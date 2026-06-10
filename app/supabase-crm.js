@@ -125,6 +125,8 @@ export async function loadCrmConfig() {
   const data = await loadAdminData();
   return {
     organization: data.organization || null,
+    organizations: data.organizations || [],
+    globalAdmin: Boolean(data.globalAdmin),
     managers: data.managers.map((manager) => ({
       id: manager.id,
       code: managerNameToCode(manager.name),
@@ -187,7 +189,7 @@ export async function loadCrmConfig() {
   };
 }
 
-export async function createManager({ name, email, password, role, color }) {
+export async function createManager({ name, email, password, role, color, organizationId }) {
   if (!supabase) throw new Error("Supabase nu este configurat.");
 
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
@@ -202,7 +204,7 @@ export async function createManager({ name, email, password, role, color }) {
       "Content-Type": "application/json",
       Authorization: `Bearer ${accessToken}`
     },
-    body: JSON.stringify({ name, email, password, role, color })
+    body: JSON.stringify({ name, email, password, role, color, organizationId })
   });
 
   const payload = await response.json();
@@ -278,10 +280,20 @@ export async function createNeedCategory({ code, name }) {
   return saveAdminSetting("POST", { type: "needCategory", code, name, active: true });
 }
 
-export async function updateManager(id, { name, email, role, color, active }) {
+export async function updateManager(id, { name, email, role, color, active, organizationId }) {
   if (!supabase) throw new Error("Supabase nu este configurat.");
-  const { error } = await supabase.from("managers").update({ name, email, role, color, active }).eq("id", id);
+  const values = { name, email, role, color, active };
+  if (organizationId) values.organization_id = organizationId;
+  const { error } = await supabase.from("managers").update(values).eq("id", id);
   if (error) throw error;
+}
+
+export async function createOrganization({ name, slug, metaPageId, manychatPageId }) {
+  return saveAdminSetting("POST", { type: "organization", name, slug, metaPageId, manychatPageId, active: true });
+}
+
+export async function updateOrganization(id, { name, slug, metaPageId, manychatPageId, active }) {
+  return saveAdminSetting("PATCH", { id, type: "organization", name, slug, metaPageId, manychatPageId, active });
 }
 
 export async function countActiveLeadsForManager(managerId) {
