@@ -1919,6 +1919,10 @@ function normalizeLead(lead) {
   };
 }
 
+function slugifyInput(value) {
+  return String(value || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
 function leadInboxTime(lead) {
   const lastMessage = (lead.messages || []).reduce((latest, message) => {
     const value = Date.parse(message.sentAt || message.createdAt || "");
