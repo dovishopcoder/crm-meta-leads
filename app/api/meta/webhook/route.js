@@ -46,7 +46,7 @@ export async function POST(request) {
 
   for (const message of messages) {
     const organization = await resolveOrganization(supabase, message);
-    const enrichedMessage = await enrichMessageProfile(message);
+    const enrichedMessage = await enrichMessageProfile(message, organization);
     const lead = await upsertLeadFromMessage(supabase, enrichedMessage, organization);
     processed.push({ id: lead.id, name: lead.name, platform: lead.platform });
   }
@@ -114,16 +114,17 @@ function normalizeWebhookPayload(payload) {
   return messages;
 }
 
-async function enrichMessageProfile(message) {
-  if (!pageAccessToken || !message.metaContactId) return message;
+async function enrichMessageProfile(message, organization = null) {
+  const accessToken = organization?.meta_page_access_token || pageAccessToken;
+  if (!accessToken || !message.metaContactId) return message;
 
   try {
     const url = new URL(`https://graph.facebook.com/${graphVersion}/${message.metaContactId}`);
     url.searchParams.set("fields", "first_name,last_name,name,profile_pic,email");
-    url.searchParams.set("access_token", pageAccessToken);
+    url.searchParams.set("access_token", accessToken);
 
     const response = await fetch(url);
-    if (!response.ok) return enrichMessageParticipants(message);
+    if (!response.ok) return enrichMessageParticipants(message, accessToken);
 
     const profile = await response.json();
     const name = profile.name || [profile.first_name, profile.last_name].filter(Boolean).join(" ");
@@ -133,24 +134,24 @@ async function enrichMessageProfile(message) {
       name: name || message.name,
       avatarUrl: profile.profile_pic || message.avatarUrl,
       email: profile.email || message.email || ""
-    });
+    }, accessToken);
   } catch {
-    return enrichMessageParticipants(message);
+    return enrichMessageParticipants(message, accessToken);
   }
 }
 
-async function enrichMessageParticipants(message) {
-  if (message.email || !pageAccessToken || !message.metaContactId || !message.pageId) {
+async function enrichMessageParticipants(message, accessToken = pageAccessToken) {
+  if (message.email || !accessToken || !message.metaContactId || !message.pageId) {
     return message;
   }
 
   try {
-    const conversation = await findConversationForContact(message.pageId, message.metaContactId);
+    const conversation = await findConversationForContact(message.pageId, message.metaContactId, accessToken);
     if (!conversation?.id) return message;
 
     const url = new URL(`https://graph.facebook.com/${graphVersion}/${conversation.id}`);
     url.searchParams.set("fields", "participants");
-    url.searchParams.set("access_token", pageAccessToken);
+    url.searchParams.set("access_token", accessToken);
 
     const response = await fetch(url);
     if (!response.ok) return message;
@@ -207,11 +208,11 @@ function normalizeMetaConversationLink(link) {
   }
 }
 
-async function findConversationForContact(pageId, contactId) {
+async function findConversationForContact(pageId, contactId, accessToken = pageAccessToken) {
   const contactUrl = new URL(`https://graph.facebook.com/${graphVersion}/${contactId}/conversations`);
   contactUrl.searchParams.set("fields", "id,link,participants,updated_time");
   contactUrl.searchParams.set("limit", "5");
-  contactUrl.searchParams.set("access_token", pageAccessToken);
+  contactUrl.searchParams.set("access_token", accessToken);
 
   const contactResponse = await fetch(contactUrl);
   if (contactResponse.ok) {
@@ -224,7 +225,7 @@ async function findConversationForContact(pageId, contactId) {
   directUrl.searchParams.set("fields", "id,link,participants,updated_time");
   directUrl.searchParams.set("user_id", contactId);
   directUrl.searchParams.set("limit", "5");
-  directUrl.searchParams.set("access_token", pageAccessToken);
+  directUrl.searchParams.set("access_token", accessToken);
 
   const directResponse = await fetch(directUrl);
   if (directResponse.ok) {
@@ -236,7 +237,7 @@ async function findConversationForContact(pageId, contactId) {
   const listUrl = new URL(`https://graph.facebook.com/${graphVersion}/${pageId}/conversations`);
   listUrl.searchParams.set("fields", "id,link,participants,updated_time");
   listUrl.searchParams.set("limit", "25");
-  listUrl.searchParams.set("access_token", pageAccessToken);
+  listUrl.searchParams.set("access_token", accessToken);
 
   const listResponse = await fetch(listUrl);
   if (!listResponse.ok) return null;
@@ -388,21 +389,40 @@ function chooseMetaUrl(existingUrl, existingVerified, generatedUrl, contactId) {
 async function resolveOrganization(supabase, message) {
   const pageId = String(message.pageId || "").trim();
   if (pageId) {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("organizations")
-      .select("id, name, slug")
+      .select("id, name, slug, meta_page_access_token")
       .or(`meta_page_id.eq.${pageId},manychat_page_id.eq.${pageId}`)
       .eq("active", true)
       .maybeSingle();
+    if (isMissingMetaTokenColumnError(error)) {
+      const fallback = await supabase
+        .from("organizations")
+        .select("id, name, slug")
+        .or(`meta_page_id.eq.${pageId},manychat_page_id.eq.${pageId}`)
+        .eq("active", true)
+        .maybeSingle();
+      data = fallback.data;
+      error = fallback.error;
+    }
     if (!error && data) return data;
     if (error && !isMissingOrganizationTableError(error)) throw error;
   }
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("organizations")
-    .select("id, name, slug")
+    .select("id, name, slug, meta_page_access_token")
     .eq("slug", "dovi-crm")
     .maybeSingle();
+  if (isMissingMetaTokenColumnError(error)) {
+    const fallback = await supabase
+      .from("organizations")
+      .select("id, name, slug")
+      .eq("slug", "dovi-crm")
+      .maybeSingle();
+    data = fallback.data;
+    error = fallback.error;
+  }
   if (!error) return data || null;
   if (isMissingOrganizationTableError(error)) return null;
   throw error;
@@ -432,6 +452,10 @@ function removeUndefined(object) {
 
 function isMissingOrganizationColumnError(error) {
   return error?.code === "PGRST204" && /organization_id|schema cache/i.test(error?.message || "");
+}
+
+function isMissingMetaTokenColumnError(error) {
+  return ["42703", "PGRST204"].includes(error?.code) && /meta_page_access_token|schema cache/i.test(error?.message || "");
 }
 
 function isMissingOrganizationTableError(error) {

@@ -308,8 +308,8 @@ export async function createOrganization({ name, slug, metaPageId, manychatPageI
   return saveAdminSetting("POST", { type: "organization", name, slug, metaPageId, manychatPageId, active: true });
 }
 
-export async function updateOrganization(id, { name, slug, metaPageId, manychatPageId, active }) {
-  return saveAdminSetting("PATCH", { id, type: "organization", name, slug, metaPageId, manychatPageId, active });
+export async function updateOrganization(id, { name, slug, metaPageId, manychatPageId, metaPageAccessToken, active }) {
+  return saveAdminSetting("PATCH", { id, type: "organization", name, slug, metaPageId, manychatPageId, metaPageAccessToken, active });
 }
 
 export async function countActiveLeadsForManager(managerId) {

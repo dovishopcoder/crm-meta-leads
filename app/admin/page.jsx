@@ -324,7 +324,7 @@ export default function AdminPage() {
             </form>
             <AdminTable
               title="Organizatii"
-              columns={["Nume", "Slug", "Meta Page ID", "ManyChat Page ID", "Activa"]}
+              columns={["Nume", "Slug", "Meta Page ID", "ManyChat Page ID", "Meta token", "Activa"]}
               rows={adminData.organizations || []}
               type="organization"
               editing={editing}
@@ -759,6 +759,7 @@ function ReadOnlyCells({ type, row, globalAdmin = false }) {
         <td>{row.slug}</td>
         <td>{row.meta_page_id || "-"}</td>
         <td>{row.manychat_page_id || "-"}</td>
+        <td>{row.meta_page_access_token ? "Setat" : "-"}</td>
         <td>{row.active ? "Da" : "Nu"}</td>
       </>
     );
@@ -814,6 +815,7 @@ function EditableCells({ type, form, onChange, organizations = [], globalAdmin =
         <td><input className="table-input" value={form.slug || ""} onChange={(event) => update("slug", slugifyInput(event.target.value))} /></td>
         <td><input className="table-input" value={form.metaPageId || form.meta_page_id || ""} onChange={(event) => update("metaPageId", event.target.value)} /></td>
         <td><input className="table-input" value={form.manychatPageId || form.manychat_page_id || ""} onChange={(event) => update("manychatPageId", event.target.value)} /></td>
+        <td><input className="table-input" type="password" value={form.metaPageAccessToken || ""} onChange={(event) => update("metaPageAccessToken", event.target.value)} placeholder={form.meta_page_access_token ? "Token setat" : "Page access token"} /></td>
         <td><select className="table-input" value={String(Boolean(form.active))} onChange={(event) => update("active", event.target.value === "true")}><option value="true">Da</option><option value="false">Nu</option></select></td>
       </>
     );

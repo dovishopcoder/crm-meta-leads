@@ -23,10 +23,6 @@ function publicSupabase() {
 
 export async function POST(request) {
   try {
-    if (!manyChatApiKey && !metaPageAccessToken) {
-      return NextResponse.json({ error: "Puntea de mesaje nu este configurata pe server." }, { status: 500 });
-    }
-
     const token = getBearerToken(request);
     if (!token) return NextResponse.json({ error: "Sesiunea lipseste." }, { status: 401 });
 
@@ -45,8 +41,10 @@ export async function POST(request) {
     const lead = await loadLeadForSending(supabase, leadId, manager.organization_id || "");
     const subscriberId = lead.manychat_id || normalizeManyChatId(lead.meta_contact_id);
     const metaRecipientId = normalizeMetaContactId(lead.meta_contact_id);
+    const organizationMetaToken = lead.organizations?.meta_page_access_token || "";
+    const effectiveMetaToken = organizationMetaToken || metaPageAccessToken;
     const canSendManyChat = Boolean(subscriberId && (lead.manychat_id || String(lead.meta_contact_id || "").startsWith("manychat:")) && manyChatApiKey);
-    const canSendMeta = Boolean(metaRecipientId && metaPageAccessToken);
+    const canSendMeta = Boolean(metaRecipientId && effectiveMetaToken);
 
     if (!canSendManyChat && !canSendMeta) {
       return NextResponse.json({ error: "Acest lead nu are o punte activa pentru trimitere." }, { status: 400 });
@@ -99,7 +97,7 @@ export async function POST(request) {
 
       externalMessageId = responsePayload?.data?.message_id || responsePayload?.message_id || "";
     } else {
-      const metaResult = await sendMetaMessages(metaRecipientId, text, imageUrl);
+      const metaResult = await sendMetaMessages(metaRecipientId, text, imageUrl, effectiveMetaToken);
       if (!metaResult.ok) {
         await safeInsertOutgoingMessage(supabase, lead.id, manager.id, storedBody, "failed", "", metaResult.error);
         return jsonError(metaResult.error, 400);
@@ -234,7 +232,7 @@ async function requireActiveManager(token, supabase) {
 async function loadLeadForSending(supabase, leadId, organizationId = "") {
   let query = supabase
     .from("leads")
-    .select("id, meta_contact_id, manychat_id, organization_id, organizations(manychat_api_key, manychat_send_endpoint)")
+    .select("id, meta_contact_id, manychat_id, organization_id, organizations(manychat_api_key, manychat_send_endpoint, meta_page_access_token)")
     .eq("id", leadId);
   if (organizationId) query = query.eq("organization_id", organizationId);
   let { data, error } = await query.maybeSingle();
@@ -308,7 +306,7 @@ function manyChatErrorMessage(status, payload, text) {
   return `Puntea de mesaje nu a acceptat mesajul. Status: ${status}${cleanText ? `: ${cleanText.slice(0, 180)}` : ""}`;
 }
 
-async function sendMetaMessages(recipientId, text, imageUrl) {
+async function sendMetaMessages(recipientId, text, imageUrl, accessToken = metaPageAccessToken) {
   const sentIds = [];
 
   if (imageUrl) {
@@ -320,7 +318,7 @@ async function sendMetaMessages(recipientId, text, imageUrl) {
           payload: { url: imageUrl, is_reusable: true }
         }
       }
-    });
+    }, accessToken);
     if (!imageResult.ok) return imageResult;
     if (imageResult.messageId) sentIds.push(imageResult.messageId);
   }
@@ -329,7 +327,7 @@ async function sendMetaMessages(recipientId, text, imageUrl) {
     const textResult = await sendMetaPayload({
       recipient: { id: String(recipientId) },
       message: { text }
-    });
+    }, accessToken);
     if (!textResult.ok) return textResult;
     if (textResult.messageId) sentIds.push(textResult.messageId);
   }
@@ -337,9 +335,9 @@ async function sendMetaMessages(recipientId, text, imageUrl) {
   return { ok: true, messageId: sentIds.filter(Boolean).join(",") };
 }
 
-async function sendMetaPayload(payload) {
+async function sendMetaPayload(payload, accessToken = metaPageAccessToken) {
   const url = new URL(`https://graph.facebook.com/${metaGraphVersion}/me/messages`);
-  url.searchParams.set("access_token", metaPageAccessToken);
+  url.searchParams.set("access_token", accessToken);
 
   const response = await fetch(url, {
     method: "POST",

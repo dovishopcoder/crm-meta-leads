@@ -133,7 +133,11 @@ export async function POST(request) {
       if (!isGlobalAdmin(manager)) return NextResponse.json({ error: "Doar adminul global poate crea organizatii." }, { status: 403 });
       const payload = buildOrganizationPayload(body);
       if (!payload.name || !payload.slug) return NextResponse.json({ error: "Completeaza numele si slug-ul organizatiei." }, { status: 400 });
-      const { data, error } = await supabase.from("organizations").insert(payload).select("id, name, slug, meta_page_id, manychat_page_id, active").single();
+      const { data, error } = await saveOrganizationWithTokenFallback(
+        () => supabase.from("organizations").insert(payload).select("id, name, slug, meta_page_id, manychat_page_id, meta_page_access_token, active").single(),
+        () => supabase.from("organizations").insert(payload).select("id, name, slug, meta_page_id, manychat_page_id, active").single(),
+        payload
+      );
       if (error) throw error;
       await cloneDefaultSettingsToOrganization(supabase, data.id, manager.organization_id);
       return NextResponse.json({ ok: true, data });
@@ -184,7 +188,11 @@ export async function PATCH(request) {
       const id = String(body.id || "").trim();
       if (!id) return NextResponse.json({ error: "Organizatia lipseste." }, { status: 400 });
       const payload = buildOrganizationPayload(body);
-      const { data, error } = await supabase.from("organizations").update(payload).eq("id", id).select("id, name, slug, meta_page_id, manychat_page_id, active").single();
+      const { data, error } = await saveOrganizationWithTokenFallback(
+        () => supabase.from("organizations").update(payload).eq("id", id).select("id, name, slug, meta_page_id, manychat_page_id, meta_page_access_token, active").single(),
+        () => supabase.from("organizations").update(payload).eq("id", id).select("id, name, slug, meta_page_id, manychat_page_id, active").single(),
+        payload
+      );
       if (error) throw error;
       return NextResponse.json({ ok: true, data });
     }
@@ -313,7 +321,7 @@ function buildPayload(type, body) {
 }
 
 function buildOrganizationPayload(body) {
-  return {
+  const payload = {
     name: String(body.name || "").trim(),
     slug: String(body.slug || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""),
     meta_page_id: String(body.metaPageId || body.meta_page_id || "").trim() || null,
@@ -321,6 +329,18 @@ function buildOrganizationPayload(body) {
     active: body.active !== false,
     updated_at: new Date().toISOString()
   };
+  const token = String(body.metaPageAccessToken || body.meta_page_access_token || "").trim();
+  if (token) payload.meta_page_access_token = token;
+  return payload;
+}
+
+async function saveOrganizationWithTokenFallback(action, fallbackAction, payload) {
+  let result = await action();
+  if (result.error && isMissingMetaTokenColumnError(result.error)) {
+    delete payload.meta_page_access_token;
+    result = await fallbackAction();
+  }
+  return result;
 }
 
 function getRequestedOrganizationId(request, manager, globalAdmin) {
@@ -338,9 +358,16 @@ function getBodyOrganizationId(body, manager, globalAdmin) {
 async function loadOrganizations(supabase, manager, globalAdmin) {
   const query = supabase
     .from("organizations")
-    .select("id, name, slug, meta_page_id, manychat_page_id, active, created_at")
+    .select("id, name, slug, meta_page_id, manychat_page_id, meta_page_access_token, active, created_at")
     .order("created_at", { ascending: true });
-  const result = globalAdmin || !manager.organization_id ? await query : await query.eq("id", manager.organization_id);
+  let result = globalAdmin || !manager.organization_id ? await query : await query.eq("id", manager.organization_id);
+  if (isMissingMetaTokenColumnError(result.error)) {
+    const fallbackQuery = supabase
+      .from("organizations")
+      .select("id, name, slug, meta_page_id, manychat_page_id, active, created_at")
+      .order("created_at", { ascending: true });
+    result = globalAdmin || !manager.organization_id ? await fallbackQuery : await fallbackQuery.eq("id", manager.organization_id);
+  }
   if (!result.error) return result;
   if (isMissingOrganizationTableError(result.error)) return { data: [], error: null };
   return result;
@@ -574,6 +601,10 @@ function isMissingPositionError(error) {
 
 function isMissingOrganizationColumnError(error) {
   return error?.code === "PGRST204" && /organization_id|schema cache/i.test(error?.message || "");
+}
+
+function isMissingMetaTokenColumnError(error) {
+  return ["42703", "PGRST204"].includes(error?.code) && /meta_page_access_token|schema cache/i.test(error?.message || "");
 }
 
 function getBearerToken(request) {
